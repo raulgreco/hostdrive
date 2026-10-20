@@ -14,9 +14,16 @@
     "windows": [{ "title": "HostDrive", "width": 1280, "height": 800, "minWidth": 900, "minHeight": 600 }],
     "security": { "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: http://asset.localhost" }
   },
+  "plugins": {
+    "updater": {
+      "endpoints": ["https://github.com/raulgreco/hostdrive/releases/latest/download/latest.json"],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDUzRjIzMzFFOEM4NDU1OUEKUldTYVZZU01IalB5VTlqR3ZzMkhwQ3kxcWR1U0RLTm1XNW9wNGRuRE55dldzdUFOM1E4enVrRDMK"
+    }
+  },
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
     "windows": {
       "webviewInstallMode": { "type": "embedBootstrapper", "silent": true },

@@ -6,6 +6,8 @@ Atualizado em 2026-10-18. Primeira versão macOS: **CONCLUÍDA**. Build Windows 
 
 **2026-10-18 — rebatizado para HostDrive**: nome do produto, identificador do app (`app.hostdrive.desktop`), binário principal, banco SQLite (`hostdrive.sqlite`) e ícone (extraído de `logo-1.png`, fornecido pelo usuário) atualizados em todo o projeto. Ver também a linha `CONTINUIDADE_CLOUD` abaixo: sincronização opcional via Nextcloud implementada nesta mesma rodada (`docs/decisions/005-nextcloud-sync.md`).
 
+**2026-10-20 — repositório público e atualização automática**: projeto publicado em https://github.com/raulgreco/hostdrive (primeiro commit com todo o histórico de decisões). Atualização automática via `tauri-plugin-updater` contra `latest.json` das GitHub Releases, assinada (chave privada fora do repositório), com publicação automatizada em CI (`.github/workflows/release.yml`) mas Release sempre criada como rascunho — nenhuma versão chega aos usuários sem publicação manual. Detalhes em `docs/decisions/006-auto-update.md`.
+
 | ID | Estado | Evidências | Testes | Observações |
 |---|---|---|---|---|
 | FASE-0 | IMPLEMENTED | `docs/feasibility.md` | Ferramentas e quatro CLIs inspecionadas | Windows build `NOT_VERIFIED` → ver REQ-001 |
@@ -39,6 +41,7 @@ Atualizado em 2026-10-18. Primeira versão macOS: **CONCLUÍDA**. Build Windows 
 | NFR-009 | IMPLEMENTED | `tauri build`/`cargo xwin build` geram binário e bundle standalone; Node/Vite só são necessários em tempo de build, não no app instalado | `.app`/ZIP e instalador Windows não dependem de Node no runtime | Não havia entrada própria na tabela; adicionada nesta auditoria |
 | CONFIG | IMPLEMENTED | Conta local, privacidade, captura, tema e retenção planejada | Preferência salva e relida no release |
 | CONTINUIDADE_CLOUD | IMPLEMENTED_BASE | Sincronização via Nextcloud/WebDAV opcional (`docs/decisions/005-nextcloud-sync.md`): memória, tarefas, UAHP e preferências, cifrados no cliente (AES-256-GCM + Argon2), credenciais só no chaveiro do SO, histórico de terminal opt-in por projeto, automática ao trocar/fechar projeto, conflito nunca decidido silenciosamente | 19 testes Rust incluindo round-trip de criptografia; cross-compila para Windows sem ajuste | Chamadas WebDAV reais contra um Nextcloud de verdade `NOT_VERIFIED` — sem instância disponível neste ambiente para testar |
+| ATUALIZAÇÃO_AUTOMÁTICA | IMPLEMENTED_BASE | `tauri-plugin-updater` + GitHub Releases (`docs/decisions/006-auto-update.md`); aviso não-intrusivo, download/instalação só por ação explícita do usuário, pacotes assinados (chave privada fora do repositório), CI builda e publica como rascunho | App compila e abre normalmente nos dois SOs com os plugins registrados; bundle `.app.tar.gz` do updater gerado corretamente | Fluxo completo ponta a ponta (detectar versão nova de verdade e instalar) `NOT_VERIFIED` — depende do primeiro release real publicado |
 
 ## Evidência final
 

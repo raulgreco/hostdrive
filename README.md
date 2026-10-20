@@ -83,4 +83,17 @@ Os binários são PE32+ válidos e o instalador é um NSIS PE32 GUI válido (tud
 
 Em Configurações → Nextcloud: informe o endereço do servidor, o usuário, uma **senha de app** (gerada em Configurações → Segurança no próprio Nextcloud, nunca a senha principal da conta) e uma **frase de criptografia** própria (cifra os dados antes de saírem da máquina — nem o Nextcloud vê o conteúdo). As duas credenciais ficam só no chaveiro do sistema operacional. Com a sincronização ativada, abrir ou trocar de projeto traz o que há de mais novo; fechar a janela ou trocar de projeto envia o que mudou. Em caso de mudanças nas duas pontas ao mesmo tempo, o app pergunta qual versão manter — nunca decide sozinho. Histórico de terminal fica de fora por padrão; ative por projeto se quiser incluí-lo. Detalhes completos e o que fica **de fora** da sincronização em `docs/decisions/005-nextcloud-sync.md`.
 
-Consulte `docs/implementation-status.md` para evidências e limitações verificadas, `docs/decisions/003-resume-palette-theme.md` para as decisões de retomada de sessão/paleta/tema, `docs/decisions/004-windows-executable-detection-fix.md` para a correção de detecção de agentes no Windows, e `docs/decisions/005-nextcloud-sync.md` para a sincronização.
+## Atualização automática
+
+O app consulta `https://github.com/raulgreco/hostdrive/releases/latest/download/latest.json` ao abrir; se houver versão mais nova, mostra um aviso — **nada é baixado ou instalado sem o usuário clicar "Atualizar agora"**. Toda atualização é assinada; o app recusa instalar qualquer pacote sem a assinatura correta. Detalhes em `docs/decisions/006-auto-update.md`.
+
+**Para publicar uma versão nova:**
+1. Atualize `"version"` em `src-tauri/tauri.conf.json`.
+2. `git commit` e `git push`.
+3. `git tag v0.1.1 && git push origin v0.1.1` (troque pelo número real).
+4. O GitHub Actions builda macOS e Windows automaticamente e cria uma **Release em rascunho** com os instaladores e o `latest.json` assinados.
+5. Revise o rascunho em https://github.com/raulgreco/hostdrive/releases e clique em **Publish release** — só a partir daí os usuários recebem o aviso de atualização.
+
+A chave privada de assinatura vive em `~/.hostdrive-keys/hostdrive-updater.key` (fora do repositório) e como secret `TAURI_SIGNING_PRIVATE_KEY` no GitHub — **faça backup desse arquivo**; perdê-lo significa não poder mais assinar atualizações para quem já instalou o app.
+
+Consulte `docs/implementation-status.md` para evidências e limitações verificadas, `docs/decisions/003-resume-palette-theme.md` para as decisões de retomada de sessão/paleta/tema, `docs/decisions/004-windows-executable-detection-fix.md` para a correção de detecção de agentes no Windows, `docs/decisions/005-nextcloud-sync.md` para a sincronização, e `docs/decisions/006-auto-update.md` para a atualização automática.

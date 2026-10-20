@@ -1,0 +1,61 @@
+name: Release
+
+# Dispara ao empurrar uma tag "vX.Y.Z" (ex.: v0.1.1), ou manualmente pela
+# aba Actions. Builda macOS e Windows em runners reais do GitHub — nada de
+# cross-compilação aqui, diferente do fluxo de desenvolvimento local
+# (docs/decisions/002-windows-cross-compilation.md), que só existe porque
+# este Mac não tinha outra forma de validar o build Windows antes de ter CI.
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            args: "--target aarch64-apple-darwin"
+          - platform: windows-latest
+            args: ""
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Instalar Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin' || '' }}
+
+      - name: Cache do Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: Instalar dependências do npm
+        run: npm ci
+
+      - name: Build + assinatura + publicação no Release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "HostDrive ${{ github.ref_name }}"
+          releaseBody: "Ver detalhes em docs/implementation-status.md e docs/decisions/."
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}

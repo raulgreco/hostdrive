@@ -8,6 +8,7 @@ import { MemoryPane } from "./components/MemoryPane";
 import { TasksPane } from "./components/TasksPane";
 import { GitPane } from "./components/GitPane";
 import { HandoffDialog } from "./components/HandoffDialog";
+import { UpdateBanner } from "./components/UpdateBanner";
 import hostdriveIcon from "./assets/hostdrive-icon.png";
 import { agents as fallbackAgents } from "./data/workspace";
 import { detectInstalledAgents } from "./services/agents";
@@ -15,6 +16,7 @@ import { chooseAndAddProject, listProjects, setProjectArchived, setProjectFavori
 import { getAppSettings, type AppSettings, type ThemePreference } from "./services/settings";
 import { syncProjectNow } from "./services/sync";
 import { isTauriRuntime } from "./services/terminal";
+import { checkForUpdate, type UpdateInfo } from "./services/updater";
 
 /** NFR-006 — aplica a preferência de tema ao documento, inclusive quando "Sistema" muda em tempo real. */
 function useAppliedTheme(preference: ThemePreference) {
@@ -43,6 +45,7 @@ export function App() {
   const [nextcloudSyncEnabled, setNextcloudSyncEnabled] = useState(false);
   const [syncStatus, setSyncStatus] = useState<string | null>(null);
   const [syncConflict, setSyncConflict] = useState<{ projectId: string; message: string } | null>(null);
+  const [availableUpdate, setAvailableUpdate] = useState<UpdateInfo | null>(null);
   const selectedProject = projects.find((project) => project.id === selectedProjectId) ?? null;
   useAppliedTheme(theme);
 
@@ -73,6 +76,14 @@ export function App() {
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  // Checagem de atualização: só consulta o manifesto assinado nas Releases
+  // do GitHub e avisa — nunca baixa/instala nada sem o usuário clicar.
+  useEffect(() => {
+    let active = true;
+    checkForUpdate().then((update) => { if (active && update) setAvailableUpdate(update); }).catch(() => undefined);
+    return () => { active = false; };
   }, []);
 
   // Sincronização automática: ao trocar de projeto, envia o que ficou para
@@ -156,6 +167,7 @@ export function App() {
     <header className="titlebar" data-tauri-drag-region><img src={hostdriveIcon} alt="" className="app-icon" aria-hidden="true" /><strong>HostDrive</strong><div className="titlebar-status"><span><StatusDot />Local</span><span>{agents.filter((agent) => agent.available).length} agentes detectados</span><button className="icon-button" aria-label="Configurações" onClick={() => setSettingsOpen(true)}>⚙</button></div></header>
     <Sidebar agents={agents} projects={projects} selectedProjectId={selectedProjectId} onProjectSelect={(project) => setSelectedProjectId(project.id)} onAddProject={addProject} onFavorite={toggleFavorite} onArchive={archiveProject} />
     <section className="project-header"><div><h1>{selectedProject?.name ?? "Abra um projeto"}</h1><span>{selectedProject?.path ?? "Selecione uma pasta para começar"}</span></div><div className="project-header-actions">{nextcloudSyncEnabled && selectedProject ? <button className={selectedProject.syncTerminalHistory ? "sync-history-toggle sync-history-toggle--active" : "sync-history-toggle"} onClick={() => toggleTerminalHistorySync(selectedProject)} title="Histórico de terminal pode conter segredos colados — desligado por padrão">☁ Histórico no Nextcloud: {selectedProject.syncTerminalHistory ? "ligado" : "desligado"}</button> : null}<button className="handoff-button" disabled={!selectedProject} onClick={() => setHandoffOpen(true)}>⇄ <span>Transferir contexto</span></button></div></section>
+    {availableUpdate ? <UpdateBanner update={availableUpdate} onDismiss={() => setAvailableUpdate(null)} /> : null}
     {projectError ? <div className="project-error" role="alert">{projectError}</div> : null}
     {syncConflict ? <div className="project-error sync-conflict" role="alert"><p>{syncConflict.message}</p><div className="sync-conflict-actions"><button className="secondary-button" onClick={() => resolveSyncConflict("local")}>Usar versão local</button><button className="secondary-button" onClick={() => resolveSyncConflict("remote")}>Usar versão do Nextcloud</button></div></div> : null}
     {!syncConflict && syncStatus ? <div className="sync-status" role="status" onClick={() => setSyncStatus(null)}>☁ {syncStatus}</div> : null}
