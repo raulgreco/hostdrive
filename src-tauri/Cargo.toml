@@ -22,11 +22,15 @@ rusqlite = { version = "0.40", features = ["bundled"] }
 uuid = { version = "1", features = ["v4"] }
 wait-timeout = "0.2"
 # Sincronização opcional via Nextcloud (WebDAV) — ver docs/decisions/005-nextcloud-sync.md
-ureq = "3"
+# reqwest (não ureq: ureq-proto recusa métodos WebDAV como MKCOL/PROPFIND
+# por não estarem na lista fixa de métodos "padrão" HTTP/1.1 que valida —
+# ver docs/decisions/005-nextcloud-sync.md, nota da correção). TLS já vem
+# resolvido via tauri-plugin-updater (rustls+ring); não repetimos feature
+# de TLS aqui para não divergir da combinação já unificada pelo Cargo.
+reqwest = { version = "0.13", default-features = false }
 keyring = "4"
 aes-gcm = "0.10"
 argon2 = "0.5"
-base64 = "0.22"
 tauri-plugin-updater = "2.14.0"
 tauri-plugin-process = "2.4.0"
 

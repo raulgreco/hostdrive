@@ -19,14 +19,12 @@ use aes_gcm::aead::rand_core::RngCore;
 use aes_gcm::aead::{Aead, KeyInit, OsRng};
 use aes_gcm::{Aes256Gcm, Key, Nonce};
 use argon2::Argon2;
-use base64::Engine;
 use keyring::Entry;
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
     fs,
-    io::Read,
     time::{SystemTime, UNIX_EPOCH},
 };
 use tauri::State;
@@ -106,11 +104,11 @@ pub fn clear_nextcloud_credentials() -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn test_nextcloud_connection(repository: State<'_, ProjectRepository>) -> Result<String, String> {
+pub async fn test_nextcloud_connection(repository: State<'_, ProjectRepository>) -> Result<String, String> {
     let settings = read_app_settings(&repository).map_err(db_error)?;
     let config = NextcloudConfig::from_settings(&settings)?;
-    let agent = ureq::Agent::new_with_defaults();
-    ensure_remote_folder(&agent, &config)?;
+    let client = reqwest::Client::new();
+    ensure_remote_folder(&client, &config).await?;
     Ok(format!(
         "Conexão confirmada com {} — pasta \"{REMOTE_FOLDER}\" pronta.",
         config.base_url
@@ -118,17 +116,17 @@ pub fn test_nextcloud_connection(repository: State<'_, ProjectRepository>) -> Re
 }
 
 #[tauri::command]
-pub fn sync_project_now(
+pub async fn sync_project_now(
     repository: State<'_, ProjectRepository>,
     project_id: String,
     prefer: Option<String>,
 ) -> Result<SyncOutcome, String> {
-    sync_project(&repository, &project_id, prefer.as_deref())
+    sync_project(&repository, &project_id, prefer.as_deref()).await
 }
 
 // ------------------------------------------------------------- orquestração
 
-pub(crate) fn sync_project(
+pub(crate) async fn sync_project(
     repository: &ProjectRepository,
     project_id: &str,
     prefer: Option<&str>,
@@ -151,9 +149,9 @@ pub(crate) fn sync_project(
     let remote_name = format!("{sync_id}.uaisync");
 
     let local_payload = build_local_payload(repository, &project, &settings)?;
-    let agent = ureq::Agent::new_with_defaults();
-    ensure_remote_folder(&agent, &config)?;
-    let remote_bytes = download(&agent, &config, &remote_name)?;
+    let client = reqwest::Client::new();
+    ensure_remote_folder(&client, &config).await?;
+    let remote_bytes = download(&client, &config, &remote_name).await?;
     let now = timestamp();
 
     let decision = match remote_bytes {
@@ -192,7 +190,7 @@ pub(crate) fn sync_project(
     match decision {
         Decision::Push => {
             let blob = encrypt_payload(&passphrase, &local_payload)?;
-            upload(&agent, &config, &remote_name, &blob)?;
+            upload(&client, &config, &remote_name, &blob).await?;
             repository
                 .mark_project_synced(project_id, &sync_id, now)
                 .map_err(db_error)?;
@@ -547,10 +545,6 @@ impl NextcloudConfig {
         format!("{}/{}", self.folder_url(), percent_encode(name))
     }
 
-    fn basic_auth(&self) -> String {
-        let credentials = format!("{}:{}", self.username, self.app_password);
-        format!("Basic {}", base64::engine::general_purpose::STANDARD.encode(credentials))
-    }
 }
 
 /// Codificação percentual simples (ASCII), suficiente para o nome fixo da
@@ -569,46 +563,66 @@ fn percent_encode(value: &str) -> String {
         .collect()
 }
 
-fn ensure_remote_folder(agent: &ureq::Agent, config: &NextcloudConfig) -> Result<(), String> {
-    let request = ureq::http::Request::builder()
-        .method("MKCOL")
-        .uri(config.folder_url())
-        .header("Authorization", config.basic_auth())
-        .body(())
-        .map_err(|error| format!("falha ao montar requisição MKCOL: {error}"))?;
-    match agent.run(request) {
-        Ok(_) => Ok(()),
-        Err(ureq::Error::StatusCode(405)) => Ok(()), // já existe (Method Not Allowed na coleção)
-        Err(ureq::Error::StatusCode(401)) => Err("Nextcloud recusou a autenticação (usuário ou senha de app incorretos).".into()),
-        Err(error) => Err(format!("falha ao preparar a pasta \"{REMOTE_FOLDER}\" no Nextcloud: {error}")),
+/// `reqwest` (não `ureq`): o MKCOL do WebDAV (RFC 4918) não é um dos
+/// métodos "padrão" que `ureq-proto` aceita validar para HTTP/1.1 — ele
+/// recusa antes mesmo de tentar a rede. `reqwest`/`hyper` não têm essa
+/// lista fechada e enviam qualquer método, como o WebDAV exige.
+fn webdav_method(name: &str) -> reqwest::Method {
+    reqwest::Method::from_bytes(name.as_bytes()).expect("nome de método WebDAV estático válido")
+}
+
+async fn ensure_remote_folder(client: &reqwest::Client, config: &NextcloudConfig) -> Result<(), String> {
+    let response = client
+        .request(webdav_method("MKCOL"), config.folder_url())
+        .basic_auth(&config.username, Some(&config.app_password))
+        .send()
+        .await
+        .map_err(|error| format!("falha ao preparar a pasta \"{REMOTE_FOLDER}\" no Nextcloud: {error}"))?;
+    match response.status().as_u16() {
+        200..=299 => Ok(()),
+        405 => Ok(()), // já existe (Method Not Allowed na coleção)
+        401 | 403 => Err("Nextcloud recusou a autenticação (usuário ou senha de app incorretos).".into()),
+        status => Err(format!(
+            "falha ao preparar a pasta \"{REMOTE_FOLDER}\" no Nextcloud: HTTP {status}"
+        )),
     }
 }
 
-fn download(agent: &ureq::Agent, config: &NextcloudConfig, name: &str) -> Result<Option<Vec<u8>>, String> {
-    match agent.get(config.object_url(name)).header("Authorization", config.basic_auth()).call() {
-        Ok(mut response) => {
-            let mut bytes = Vec::new();
-            response
-                .body_mut()
-                .as_reader()
-                .read_to_end(&mut bytes)
+async fn download(client: &reqwest::Client, config: &NextcloudConfig, name: &str) -> Result<Option<Vec<u8>>, String> {
+    let response = client
+        .get(config.object_url(name))
+        .basic_auth(&config.username, Some(&config.app_password))
+        .send()
+        .await
+        .map_err(|error| format!("falha ao baixar dados do Nextcloud: {error}"))?;
+    match response.status().as_u16() {
+        200..=299 => {
+            let bytes = response
+                .bytes()
+                .await
                 .map_err(|error| format!("falha ao ler resposta do Nextcloud: {error}"))?;
-            Ok(Some(bytes))
+            Ok(Some(bytes.to_vec()))
         }
-        Err(ureq::Error::StatusCode(404)) => Ok(None),
-        Err(ureq::Error::StatusCode(401)) => Err("Nextcloud recusou a autenticação (usuário ou senha de app incorretos).".into()),
-        Err(error) => Err(format!("falha ao baixar dados do Nextcloud: {error}")),
+        404 => Ok(None),
+        401 | 403 => Err("Nextcloud recusou a autenticação (usuário ou senha de app incorretos).".into()),
+        status => Err(format!("falha ao baixar dados do Nextcloud: HTTP {status}")),
     }
 }
 
-fn upload(agent: &ureq::Agent, config: &NextcloudConfig, name: &str, bytes: &[u8]) -> Result<(), String> {
-    agent
+async fn upload(client: &reqwest::Client, config: &NextcloudConfig, name: &str, bytes: &[u8]) -> Result<(), String> {
+    let response = client
         .put(config.object_url(name))
-        .header("Authorization", config.basic_auth())
+        .basic_auth(&config.username, Some(&config.app_password))
         .header("Content-Type", "application/octet-stream")
-        .send(bytes)
+        .body(bytes.to_vec())
+        .send()
+        .await
         .map_err(|error| format!("falha ao enviar dados ao Nextcloud: {error}"))?;
-    Ok(())
+    if response.status().is_success() {
+        Ok(())
+    } else {
+        Err(format!("falha ao enviar dados ao Nextcloud: HTTP {}", response.status().as_u16()))
+    }
 }
 
 // ------------------------------------------------------------- criptografia
