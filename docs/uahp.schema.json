@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://universal-ai-cli.local/schemas/uahp-1.0.json",
+  "title": "Universal Agent Handoff Protocol Manifest",
+  "type": "object",
+  "required": ["protocol", "version", "handoff_id", "project_id", "source_agent", "target_agent", "created_at", "context_status", "working_directory", "warnings"],
+  "properties": {
+    "protocol": { "const": "UAHP" },
+    "version": { "const": "1.0" },
+    "handoff_id": { "type": "string", "format": "uuid" },
+    "project_id": { "type": "string" },
+    "source_agent": { "type": "string" },
+    "target_agent": { "type": "string" },
+    "source_session_id": { "type": ["string", "null"] },
+    "created_at": { "type": "integer" },
+    "context_status": { "enum": ["complete", "partial"] },
+    "working_directory": { "type": "string" },
+    "warnings": { "type": "array", "items": { "type": "string" } }
+  },
+  "additionalProperties": false
+}

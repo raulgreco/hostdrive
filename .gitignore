@@ -1,0 +1,16 @@
+node_modules/
+dist/
+src-tauri/target/
+src-tauri/gen/
+*.log
+.DS_Store
+*.tsbuildinfo
+# Cache de download do Windows SDK/CRT (xwin) — nunca deve ir pro repositório.
+.xwin-cache/
+# Assets soltos sem uso atual no código — avaliar depois.
+fundo.png
+fundo1.jpg
+# Chave privada de assinatura do updater — NUNCA deve ir pro repositório.
+*.key
+*.key.pub
+hostdrive-updater*

@@ -1,0 +1,32 @@
+[package]
+name = "universal-ai-cli"
+version = "0.1.0"
+description = "Local-first desktop orchestrator for AI coding CLIs"
+authors = ["HostDrive contributors"]
+edition = "2021"
+
+[lib]
+name = "universal_ai_cli_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+portable-pty = "0.9"
+rusqlite = { version = "0.40", features = ["bundled"] }
+uuid = { version = "1", features = ["v4"] }
+wait-timeout = "0.2"
+# Sincronização opcional via Nextcloud (WebDAV) — ver docs/decisions/005-nextcloud-sync.md
+ureq = "3"
+keyring = "4"
+aes-gcm = "0.10"
+argon2 = "0.5"
+base64 = "0.22"
+
+[dev-dependencies]
+tempfile = "3.27"
