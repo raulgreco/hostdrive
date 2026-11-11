@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-10",
+  "title": "Design System: Eureka42 — Universal CLI",
+  "extensions": {
+    "colorMeta": {
+      "teal-luz": { "role": "primary", "displayName": "Teal Luz", "tonalRamp": ["#05201B", "#073830", "#0A5044", "#0B7363", "#0E8A77", "#34D6BC", "#7FE7D6", "#C9F6EE"] },
+      "teal-42": { "role": "primary", "displayName": "Teal 42", "tonalRamp": ["#04120F", "#06231E", "#084239", "#0B7363", "#0E8A77", "#1BA492", "#4FC4B4", "#A8E4DB"] },
+      "ambar": { "role": "secondary", "displayName": "Âmbar Eureka", "tonalRamp": ["#241703", "#4A2F06", "#9A6406", "#C98A12", "#F2B33D", "#F7CD7A", "#FBE2B0", "#FDF3DD"] },
+      "violeta": { "role": "tertiary", "displayName": "Violeta Série-3", "tonalRamp": ["#151033", "#241B57", "#3A2D8C", "#5545C9", "#8B7CF6", "#AEA4F9", "#CDC6FB", "#EAE7FD"] },
+      "coral": { "role": "state", "displayName": "Coral Erro", "tonalRamp": ["#2B0B07", "#571610", "#8C241B", "#C03A2D", "#FF7A6B", "#FFA297", "#FFC8C1", "#FFE9E6"] },
+      "noite": { "role": "neutral", "displayName": "Noite", "tonalRamp": ["#0A0D13", "#121722", "#1A2130", "#2A3242", "#3D4761", "#5B6472", "#98A2B3", "#E9EDF2"] }
+    },
+    "shadows": [
+      { "name": "float", "value": "0 12px 32px -12px rgb(0 0 0 / .6)", "purpose": "Diálogos, paletas, picker e banner — sempre com offset e blur." }
+    ],
+    "motion": [
+      { "name": "ease-brand", "value": "cubic-bezier(.23,1,.32,1)", "purpose": "Única curva de transição do app." },
+      { "name": "press", "value": "scale(.97) 120ms", "purpose": "Feedback de pressão em botões e fichas." }
+    ],
+    "breakpoints": [
+      { "name": "narrow", "value": "900px", "purpose": "Sidebar e trilho de fichas se escondem; degradação, não alvo." }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Ação principal: Teal Luz sobre Noite, feedback de pressão.",
+      "html": "<button class=\"ds-btn-primary\">Nova sessão</button>",
+      "css": ".ds-btn-primary { background: #34D6BC; color: #0A0D13; border: 0; border-radius: 6px; padding: 8px 14px; font: 600 12px Inter, system-ui, sans-serif; cursor: pointer; transition: transform .12s cubic-bezier(.23,1,.32,1), filter .18s cubic-bezier(.23,1,.32,1); } .ds-btn-primary:hover { filter: brightness(1.06); } .ds-btn-primary:active { transform: scale(.97); } .ds-btn-primary:disabled { opacity: .5; cursor: default; }"
+    },
+    {
+      "name": "Tool Chip",
+      "kind": "chip",
+      "refersTo": "chip-tool",
+      "description": "Ficha de ferramenta do projeto; a ativa sai do trilho e anela na cor do texto.",
+      "html": "<button class=\"ds-chip\" style=\"--chip:#34D6BC; --chip-ink:#0A0D13\"><span class=\"ds-chip-card\"><b>T-01</b></span><span class=\"ds-chip-label\">TERMINAL</span></button>",
+      "css": ".ds-chip { border: 0; background: transparent; cursor: pointer; display: grid; justify-items: center; gap: 6px; } .ds-chip-card { width: 56px; height: 74px; border-radius: 9px; background: var(--chip); display: block; box-shadow: 0 1px 0 rgb(0 0 0 / .25); transition: transform .22s cubic-bezier(.23,1,.32,1); } .ds-chip-card b { display: block; padding: 6px 0 0 8px; font: 500 8.5px 'JetBrains Mono', monospace; color: var(--chip-ink); opacity: .8; letter-spacing: .06em; } .ds-chip-label { font: 500 8px 'JetBrains Mono', monospace; letter-spacing: .1em; color: #6B7686; text-transform: uppercase; } .ds-chip:active .ds-chip-card { transform: scale(.97); } .ds-chip.on .ds-chip-card { transform: translateX(10px); outline: 2px solid #E9EDF2; outline-offset: 2px; box-shadow: 0 1px 0 rgb(0 0 0 / .25), 0 10px 22px -10px var(--chip); } .ds-chip.on .ds-chip-label { color: #E9EDF2; }"
+    },
+    {
+      "name": "Field",
+      "kind": "input",
+      "description": "Campo afundado com borda que acende no foco.",
+      "html": "<input class=\"ds-field\" placeholder=\"Buscar projetos…\" />",
+      "css": ".ds-field { background: #060910; border: 1px solid #2A3242; border-radius: 6px; color: #E9EDF2; padding: 9px 11px; font: 12.5px Inter, system-ui, sans-serif; outline: 0; transition: border-color .18s cubic-bezier(.23,1,.32,1); } .ds-field::placeholder { color: #6B7686; } .ds-field:focus { border-color: #34D6BC; }"
+    },
+    {
+      "name": "Orchestrator",
+      "kind": "input",
+      "description": "Comando /// com mono e caret teal — a assinatura do produto.",
+      "html": "<div class=\"ds-orch\"><span class=\"ds-orch-caret\">///</span><input placeholder=\"agente claude · retomar · ajuda\" /></div>",
+      "css": ".ds-orch { display: flex; align-items: center; gap: 10px; border: 1px solid #2A3242; background: #121722; border-radius: 6px; padding: 8px 12px; } .ds-orch-caret { color: #34D6BC; font: 600 12px 'JetBrains Mono', monospace; } .ds-orch input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: #E9EDF2; font: 12px 'JetBrains Mono', monospace; } .ds-orch input::placeholder { color: #6B7686; }"
+    },
+    {
+      "name": "Settings Card",
+      "kind": "card",
+      "description": "Agrupamento de formulário nas Configurações.",
+      "html": "<div class=\"ds-card\"><strong>Ativar sincronização</strong><button class=\"ds-btn-secondary\">Salvar</button></div>",
+      "css": ".ds-card { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 13px 14px; border: 1px solid #2A3242; border-radius: 10px; background: #1A2130; color: #E9EDF2; font: 12px Inter, system-ui, sans-serif; } .ds-btn-secondary { border: 1px solid #2A3242; background: #1A2130; color: #E9EDF2; border-radius: 6px; padding: 8px 14px; font-size: 12px; cursor: pointer; } .ds-btn-secondary:hover { background: #060910; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "O Baralho de Chips",
+    "overview": "Um aplicativo de trabalho escuro, denso e preciso, organizado como um baralho de fichas de cor indexadas: cada ferramenta do projeto é uma ficha rotulada na paleta funcional da marca, e a ficha ativa sai do baralho — sua cor carimba o filete da área de trabalho. A identidade Eureka42 (teal sobre noite, Inter/JetBrains Mono, cantos 6/10/16) é a autoridade; as fichas são a assinatura do app dentro dela.",
+    "keyCharacteristics": ["escuro por padrão (a marca)", "cor sempre faz trabalho de estado/seção", "legendas técnicas em JetBrains Mono com tracking largo", "fichas cantos vivos de 9px", "movimento só com cubic-bezier(.23,1,.32,1) e micro-feedback de pressão", "zero glow, zero degradê"],
+    "rules": [
+      { "name": "The Brand-Only Rule", "body": "Teal é a única cor de marca; as cinco cores de ficha são exatamente os funcionais do brandbook. Nenhuma cor nova entra sem passar pela identidade.", "section": "colors" },
+      { "name": "The State-Color Rule", "body": "Coral é reservado a erro/destruição. Âmbar reservado a atenção. Verde/teal a sucesso e ativo.", "section": "colors" },
+      { "name": "The One Mono Rule", "body": "Mono é para código, dados e medida — nunca para título ou botão.", "section": "typography" },
+      { "name": "The Flat-At-Rest Rule", "body": "Profundidade é resposta, não estado padrão: sombra só em camadas flutuantes; superfícies em repouso se separam por linha.", "section": "elevation" }
+    ],
+    "dos": [
+      "usar as cores de ficha exatas (teal-luz, violeta, âmbar, teal-42, âmbar-fundo) como identidade de seção",
+      "respeitar prefers-reduced-motion e dar feedback de pressão de 120ms nos controles",
+      "usar Montserrat 800 apenas para números de destaque e o 42",
+      "trocar o logo por tema (escuro/claro)"
+    ],
+    "donts": [
+      "glow, sombra projetada ou degradê no logo da marca",
+      "coral para qualquer coisa que não erro/destruição, nem âmbar como destaque genérico",
+      "cores fora do brandbook ou degradê roxo-azul de produto de IA",
+      "serifa, emoji como ícone, sombra de offset duro, borda colorida grossa em cartões",
+      "easing elástico/bounce — a curva da marca é cubic-bezier(.23,1,.32,1)"
+    ]
+  }
+}

@@ -1,6 +1,8 @@
 mod agents;
+mod context;
 mod handoff;
 mod history;
+mod oauth;
 mod projects;
 mod sync;
 mod terminal;
@@ -31,6 +33,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             health_check,
             agents::detect_agents,
+            agents::list_project_agents,
+            agents::add_custom_agent,
+            agents::remove_custom_agent,
             projects::list_projects,
             projects::add_project,
             projects::set_project_favorite,
@@ -39,9 +44,14 @@ pub fn run() {
             projects::get_app_settings,
             projects::update_app_settings,
             projects::set_project_terminal_sync,
+            projects::set_project_files_sync,
             sync::has_nextcloud_credentials,
             sync::set_nextcloud_credentials,
             sync::clear_nextcloud_credentials,
+            sync::get_cloud_status,
+            sync::connect_cloud,
+            sync::disconnect_cloud,
+            sync::test_cloud_connection,
             sync::test_nextcloud_connection,
             sync::sync_project_now,
             workspace::list_project_memory,
@@ -53,6 +63,8 @@ pub fn run() {
             handoff::prepare_handoff,
             history::get_terminal_session_events,
             history::export_terminal_session,
+            context::get_project_context,
+            context::refresh_project_context_command,
             terminal::launch_terminal,
             terminal::send_terminal_input,
             terminal::resize_terminal,

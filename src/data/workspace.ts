@@ -9,6 +9,8 @@ export type Agent = {
   error?: string | null;
   /** REQ-007 — retomada só é oferecida quando o backend confirma suporte verificado. */
   supportsResume?: boolean;
+  /** Agente personalizado registrado pelo usuário (fora do catálogo). */
+  custom?: boolean;
 };
 
 export const agents: Agent[] = [
@@ -18,11 +20,11 @@ export const agents: Agent[] = [
   { id: "kimi", label: "Kimi", version: "0.43.1", available: true, authStatus: "UNKNOWN", supportsResume: true }
 ];
 
-export const projects = ["HostDrive", "Sistema CPA", "Portal interno"];
+export const projects = ["Eureka42", "Sistema CPA", "Portal interno"];
 
 export const terminalLines = [
-  { kind: "muted", text: "HostDrive — sessão local" },
-  { kind: "prompt", text: "~/Projetos/hostdrive  git:(—)  codex" },
+  { kind: "muted", text: "Eureka42 — sessão local" },
+  { kind: "prompt", text: "~/Projetos/eureka42  git:(—)  codex" },
   { kind: "plain", text: "Diretório carregado. Nenhum processo de agente iniciado." },
   { kind: "success", text: "✓ Codex 0.154.0 detectado" },
   { kind: "success", text: "✓ Claude 2.1.273 detectado" },

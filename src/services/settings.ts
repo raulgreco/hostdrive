@@ -8,6 +8,15 @@ export type AppSettings = {
   nextcloudUrl: string;
   nextcloudUsername: string;
   nextcloudSyncEnabled: boolean;
+  /** Contexto universal entre conversas: arquivo no projeto + injeção validada. */
+  contextCarryoverEnabled: boolean;
+  /** Provedor de nuvem: "nextcloud" | "google" | "onedrive". */
+  cloudProvider: string;
+  /** Client IDs OAuth (não secretos) — tokens ficam só no chaveiro. */
+  googleClientId: string;
+  onedriveClientId: string;
+  /** E-mail da conta cloud conectada — a identidade entre máquinas. */
+  cloudAccount: string;
 };
 
 export async function getAppSettings() {

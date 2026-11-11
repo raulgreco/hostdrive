@@ -1,6 +1,17 @@
 export type MemoryEntry = { section: string; content: string; provenance: string; updatedAt: number };
 export type ProjectTask = { id: string; title: string; completed: boolean; provenance: string; createdAt: number; updatedAt: number };
 export type GitStatus = { available: boolean; branch: string | null; head: string | null; dirty: boolean; changes: string[]; error: string | null };
+/** Contexto universal agregado do projeto — ponte entre conversas. */
+export type ProjectContext = {
+  projectId: string;
+  projectName: string;
+  generatedAt: number;
+  markdown: string;
+  memorySections: number;
+  openTasks: number;
+  recentSessions: number;
+  filePath: string | null;
+};
 
 async function call<T>(command: string, args: Record<string, unknown>) {
   const { invoke } = await import("@tauri-apps/api/core");
@@ -12,3 +23,5 @@ export const listProjectTasks = (projectId: string) => call<ProjectTask[]>("list
 export const addProjectTask = (projectId: string, title: string) => call<ProjectTask>("add_project_task", { projectId, title });
 export const setProjectTaskCompleted = (taskId: string, completed: boolean) => call<void>("set_project_task_completed", { taskId, completed });
 export const getGitStatus = (projectId: string) => call<GitStatus>("get_git_status", { projectId });
+export const getProjectContext = (projectId: string) => call<ProjectContext>("get_project_context", { projectId });
+export const refreshProjectContext = (projectId: string) => call<ProjectContext>("refresh_project_context_command", { projectId });

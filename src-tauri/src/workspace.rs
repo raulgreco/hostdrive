@@ -85,6 +85,8 @@ pub fn save_project_memory(
         "INSERT INTO project_memory(project_id,section,content,updated_at) VALUES(?1,?2,?3,?4) ON CONFLICT(project_id,section) DO UPDATE SET content=excluded.content,provenance='USER_CONFIRMED',updated_at=excluded.updated_at",
         params![project_id, section, content, now],
     ).map_err(db_error)?;
+    // Memória é ingrediente do contexto universal: republica o arquivo.
+    let _ = crate::context::write_context_file(&repository, &project_id);
     Ok(MemoryEntry {
         section,
         content,
@@ -137,6 +139,7 @@ pub fn add_project_task(
         updated_at: timestamp(),
     };
     repository.open_for_workspace().map_err(db_error)?.execute("INSERT INTO project_tasks(id,project_id,title,completed,provenance,created_at,updated_at) VALUES(?1,?2,?3,0,?4,?5,?6)", params![task.id,project_id,task.title,task.provenance,task.created_at,task.updated_at]).map_err(db_error)?;
+    let _ = crate::context::write_context_file(&repository, &project_id);
     Ok(task)
 }
 
@@ -156,6 +159,19 @@ pub fn set_project_task_completed(
         .map_err(db_error)?;
     if changed == 0 {
         return Err("tarefa não encontrada".into());
+    }
+    // Tarefa concluída muda o contexto do projeto: republica o arquivo.
+    let project_id: Option<String> = repository
+        .open_for_workspace()
+        .map_err(db_error)?
+        .query_row(
+            "SELECT project_id FROM project_tasks WHERE id=?1",
+            params![task_id],
+            |row| row.get(0),
+        )
+        .ok();
+    if let Some(project_id) = project_id {
+        let _ = crate::context::write_context_file(&repository, &project_id);
     }
     Ok(())
 }

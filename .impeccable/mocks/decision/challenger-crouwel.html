@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* Crouwel specimen: the construction grid stays visible as the armature. */
+  :root { --ink:#101010; --paper:#f6f5f2; --grid:#d7d5cf; --accent:#1d3fd8; }
+  * { margin:0; box-sizing:border-box; }
+  body { width:1440px; height:900px; overflow:hidden; background:var(--paper); color:var(--ink);
+    font-family:'Archivo',sans-serif;
+    background-image:linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size:72px 72px; display:grid; grid-template-columns:288px 1fr; }
+  aside { border-right:1px solid var(--ink); padding:0; display:flex; flex-direction:column; background:rgba(246,245,242,.86); }
+  .wordmark { padding:24px; border-bottom:1px solid var(--ink); }
+  .wordmark b { display:block; font-weight:800; font-size:30px; letter-spacing:-.02em; line-height:.95; text-transform:uppercase; }
+  .wordmark span { font-family:'IBM Plex Mono',monospace; font-size:9px; letter-spacing:.18em; }
+  .cell { padding:16px 24px; border-bottom:1px solid var(--grid); font-size:12.5px; font-weight:500; display:flex; justify-content:space-between; align-items:baseline; }
+  .cell small { font-family:'IBM Plex Mono',monospace; font-size:9px; color:#6f6c64; }
+  .cell.on { background:var(--ink); color:#fff; } .cell.on small { color:#a5a29a; }
+  main { display:grid; grid-template-rows:72px 1fr 96px; }
+  header { display:flex; align-items:end; gap:20px; padding:0 0 14px 0; margin:0 28px; border-bottom:3px solid var(--ink); }
+  header h1 { font-weight:800; font-size:34px; letter-spacing:-.03em; text-transform:uppercase; line-height:1; }
+  header p { font-size:11px; padding-bottom:4px; color:#57544c; }
+  header .sync { margin-left:auto; font-family:'IBM Plex Mono',monospace; font-size:10px; padding-bottom:4px; text-align:right; }
+  header .sync b { color:var(--accent); font-weight:500; }
+  /* monumental letterform cell-block: the H mark */
+  .hero { display:grid; grid-template-columns:144px 1fr; margin:20px 28px 0; border:1px solid var(--ink); }
+  .hmark { background:var(--accent); display:grid; grid-template-rows:repeat(6,1fr); grid-template-columns:repeat(4,1fr); }
+  .hmark i { border:.5px solid rgba(255,255,255,.35); } .hmark i.f { background:#fff; }
+  .term { background:#101216; color:#d7dfe2; padding:18px 22px; font-family:'IBM Plex Mono',monospace; font-size:11.5px; line-height:1.8; }
+  .term .g { color:#42d7c1; } .term .d { color:#5b6770; }
+  .foot { margin:18px 28px 0; border-top:1px solid var(--ink); padding-top:12px; display:grid; gap:8px; align-content:start; }
+  .orch { display:flex; gap:10px; align-items:center; font-family:'IBM Plex Mono',monospace; font-size:11px; border:1px solid var(--ink); padding:9px 13px; background:rgba(246,245,242,.9); }
+  .orch i { color:var(--accent); font-style:normal; font-weight:600; }
+  .hint { font-family:'IBM Plex Mono',monospace; font-size:9.5px; color:#6f6c64; letter-spacing:.08em; }
+</style>
+</head>
+<body>
+<aside>
+  <div class="wordmark"><b>Host<br>Drive</b><span>CONSTRUÇÃO EM CÉLULAS 4×6</span></div>
+  <div class="cell on">hostdrive<small>§01</small></div>
+  <div class="cell">Sistema CPA<small>§02</small></div>
+  <div class="cell">Portal interno<small>§03</small></div>
+  <div style="margin-top:auto; padding:16px 24px; font-family:'IBM Plex Mono',monospace; font-size:9.5px; color:#57544c">AGENTES<br>Codex · Claude<br><br>CLOUD<br>Drive · raul@gmail.com</div>
+</aside>
+<main>
+  <header>
+    <h1>Terminal</h1>
+    <p>cada elemento assenta na célula de 72px</p>
+    <div class="sync">DRIVE · RAUL@GMAIL.COM<br><b>SINCRONIZADO ●</b></div>
+  </header>
+  <section class="hero">
+    <div class="hmark" aria-hidden="true">
+      <i></i><i class="f"></i><i></i><i></i>
+      <i></i><i class="f"></i><i></i><i></i>
+      <i></i><i class="f"></i><i class="f"></i><i class="f"></i>
+      <i></i><i class="f"></i><i></i><i class="f"></i>
+      <i></i><i class="f"></i><i></i><i class="f"></i>
+      <i></i><i class="f"></i><i></i><i class="f"></i>
+    </div>
+    <div class="term">
+      <div class="d">HostDrive — PTY pronto · grid de construção visível</div>
+      <div><span class="g">~/Desktop/UNIVERSAL/universal-ai-cli</span> git:(main) codex</div>
+      <div class="g">✓ contexto universal carregado</div>
+      <div>$ uma diagonal é a única rebelião permitida</div>
+    </div>
+  </section>
+  <footer class="foot">
+    <div class="orch"><i>///</i> agente claude</div>
+    <div class="hint">A GRADE PERMANECE VISÍVEL · RECOMPOSIÇÃO CÉLULA A CÉLULA · ⌘K ⌘N ⌘,</div>
+  </footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* Category standard, played straight: the best developer-tool shell. */
+  :root { --bg:#ffffff; --panel:#fafafa; --line:#e4e4e7; --ink:#18181b; --mut:#71717a; --accent:#4f46e5; --ok:#16a34a; }
+  * { margin:0; box-sizing:border-box; }
+  body { width:1440px; height:900px; overflow:hidden; background:var(--bg); color:var(--ink); font-family:'Inter',sans-serif; display:grid; grid-template-columns:260px 1fr; }
+  aside { background:var(--panel); border-right:1px solid var(--line); padding:20px 14px; display:flex; flex-direction:column; gap:20px; }
+  .brand { font-size:13px; font-weight:600; padding:4px 10px; display:flex; gap:8px; align-items:center; }
+  .brand i { width:8px; height:8px; border-radius:2px; background:var(--accent); }
+  .group { display:grid; gap:2px; }
+  .group > span { font-size:10px; font-weight:600; color:var(--mut); text-transform:uppercase; letter-spacing:.06em; padding:0 10px 6px; }
+  .item { padding:7px 10px; border-radius:6px; font-size:12.5px; display:flex; justify-content:space-between; gap:8px; }
+  .item small { color:var(--mut); font-size:10px; }
+  .item.on { background:#eef2ff; color:var(--accent); font-weight:500; }
+  main { display:grid; grid-template-rows:56px 44px 1fr 88px; }
+  header { display:flex; align-items:center; gap:14px; padding:0 22px; border-bottom:1px solid var(--line); }
+  header h1 { font-size:14px; font-weight:600; }
+  header .crumb { font-size:11.5px; color:var(--mut); }
+  header .right { margin-left:auto; display:flex; gap:14px; align-items:center; font-size:11px; color:var(--mut); }
+  .pill { color:var(--ok); font-weight:500; display:flex; gap:6px; align-items:center; }
+  .pill::before { content:""; width:6px; height:6px; border-radius:99px; background:var(--ok); }
+  .tabs { display:flex; align-items:center; gap:2px; padding:0 22px; border-bottom:1px solid var(--line); }
+  .tab { padding:0 14px; height:100%; display:flex; align-items:center; font-size:12px; color:var(--mut); border-bottom:2px solid transparent; }
+  .tab.on { color:var(--ink); border-bottom-color:var(--accent); font-weight:500; }
+  .tab .dot { width:6px; height:6px; border-radius:99px; background:var(--ok); margin-right:6px; }
+  .cta { margin-left:auto; font-size:11.5px; color:#fff; background:var(--accent); border-radius:6px; padding:6px 12px; font-weight:500; }
+  .term { margin:18px 22px 0; background:#0b0d10; border:1px solid #27272a; border-radius:10px; padding:16px 18px; font-family:'JetBrains Mono',monospace; font-size:11.5px; line-height:1.75; color:#d4d4d8; }
+  .term .g { color:#34d399; } .term .d { color:#52525b; }
+  .foot { padding:12px 22px 0; display:grid; gap:8px; align-content:start; }
+  .cmd { display:flex; align-items:center; gap:8px; border:1px solid var(--line); background:var(--panel); border-radius:8px; padding:8px 12px; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--mut); }
+  .cmd b { color:var(--accent); font-weight:500; }
+  .keys { font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--mut); }
+</style>
+</head>
+<body>
+<aside>
+  <div class="brand"><i></i>HostDrive</div>
+  <div class="group"><span>Projetos</span>
+    <div class="item on">hostdrive<small>3</small></div>
+    <div class="item">Sistema CPA<small>1</small></div>
+    <div class="item">Portal interno<small>—</small></div>
+  </div>
+  <div class="group" style="margin-top:auto"><span>Agentes conectados</span>
+    <div class="item">Codex<small>0.154.0</small></div>
+    <div class="item">Claude<small>2.1.273</small></div>
+  </div>
+</aside>
+<main>
+  <header>
+    <h1>hostdrive</h1><span class="crumb">~/Desktop/UNIVERSAL/universal-ai-cli</span>
+    <div class="right"><span>Google Drive · raul@gmail.com</span><span class="pill">Sincronizado</span></div>
+  </header>
+  <nav class="tabs">
+    <div class="tab on"><span class="dot"></span>Codex</div>
+    <div class="tab">Claude</div>
+    <div class="tab">＋ Agente</div>
+    <div class="cta">Nova sessão</div>
+  </nav>
+  <section class="term">
+    <div class="d">HostDrive — PTY pronto · contexto carregado</div>
+    <div><span class="g">~/Desktop/UNIVERSAL/universal-ai-cli</span> git:(main) codex</div>
+    <div class="g">✓ contexto da conversa anterior aplicado</div>
+    <div>$ continuar em qualquer máquina — histórico, contexto e arquivos</div>
+    <div class="d">☁ sync: 4 enviados · 2 baixados · conflitos: nenhum</div>
+  </section>
+  <footer class="foot">
+    <div class="cmd"><b>///</b> agente claude — comandos do orquestrador</div>
+    <div class="keys">⌘K orquestrador · ⌘N novo terminal · ⌘, configurações</div>
+  </footer>
+</main>
+</body>
+</html>

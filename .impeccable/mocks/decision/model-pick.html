@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Source+Sans+3:wght@400;600&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+  :root { --ink:#1a1815; --paper:#f7f3ea; --rule:#c9c2b2; --accent:#8c1d18; }
+  * { margin:0; box-sizing:border-box; }
+  body { width:1440px; height:900px; overflow:hidden; background:var(--paper); color:var(--ink); font-family:'Source Serif 4',serif; display:grid; grid-template-columns:300px 90px 1fr 90px; }
+  /* Margin paragraph = sidebar: projects as margin notes */
+  aside { border-right:1px solid var(--rule); padding:34px 24px; font-size:12.5px; line-height:1.5; }
+  .folio { font-family:'IBM Plex Mono',monospace; font-size:9px; letter-spacing:.16em; color:#7d7666; text-transform:uppercase; border-bottom:1px solid var(--rule); padding-bottom:8px; margin-bottom:16px; }
+  .note { padding:7px 0; border-bottom:.5px solid var(--rule); }
+  .note b { font-weight:600; } .note.on { color:var(--accent); }
+  .note i { font-style:normal; font-family:'IBM Plex Mono',monospace; font-size:9px; color:#7d7666; display:block; }
+  .secno { font-family:'IBM Plex Mono',monospace; font-size:10px; color:#7d7666; }
+  /* The reading column */
+  main { display:grid; grid-template-rows:70px 1fr 96px; }
+  .runhead { display:flex; align-items:baseline; gap:14px; padding:20px 0 0; border-bottom:2px solid var(--ink); }
+  .runhead h1 { font-size:21px; font-weight:600; letter-spacing:.01em; }
+  .runhead span { margin-left:auto; font-family:'IBM Plex Mono',monospace; font-size:10px; color:#7d7666; }
+  .page { padding:22px 34px 0 0; max-width:660px; text-align:justify; hyphens:auto; }
+  .page h2 { font-size:15px; font-weight:600; margin:14px 0 6px; }
+  .page p { font-size:13.5px; line-height:1.62; margin-bottom:8px; }
+  .verb { font-family:'IBM Plex Mono',monospace; font-size:11.5px; background:#efe9db; border:1px solid var(--rule); border-radius:4px; padding:12px 16px; text-align:left; line-height:1.7; margin-top:10px; }
+  .verb .g { color:#0c6b54; }
+  .foot { border-top:1px solid var(--rule); margin-top:16px; padding-top:10px; font-family:'IBM Plex Mono',monospace; font-size:10px; color:#7d7666; display:grid; gap:6px; align-content:start; }
+  /* Outer margin: running metadata */
+  .outer { border-left:.5px solid var(--rule); padding:34px 20px; font-family:'IBM Plex Mono',monospace; font-size:9.5px; line-height:2; color:#7d7666; writing-mode:initial; }
+  .outer b { color:var(--ink); font-weight:400; }
+</style>
+</head>
+<body>
+<aside>
+  <div class="folio">Marginália — projetos</div>
+  <div class="note on"><b>hostdrive</b><i>§1 · 7 sessões</i></div>
+  <div class="note"><b>Sistema CPA</b><i>§2 · 2 sessões</i></div>
+  <div class="note"><b>Portal interno</b><i>§3 · sem sessões</i></div>
+  <div class="folio" style="margin-top:26px">Agentes</div>
+  <div class="note"><b>Codex</b><i>conectado</i></div>
+  <div class="note"><b>Claude</b><i>conectado</i></div>
+</aside>
+<div style="border-right:.5px solid var(--rule)"></div>
+<main>
+  <div class="runhead"><span class="secno">§1</span><h1>hostdrive — estado atual</h1><span>página 1 de 1</span></div>
+  <article class="page">
+    <h2>1 &nbsp;Contexto do projeto</h2>
+    <p>O HostDrive agrega memória, tarefas e conversas recentes em <b>.hostdrive/contexto.md</b>, de modo que cada nova conversa herda o estado verificado do projeto — independentemente de qual agente o teve.</p>
+    <h2>2 &nbsp;Sessão em andamento</h2>
+    <div class="verb">
+      <span class="g">~/Desktop/UNIVERSAL/universal-ai-cli</span> git:(main) codex<br>
+      <span class="g">✓</span> contexto injetado · retomada disponível (—continue)<br>
+      $ sync multi-provedor — Drive · OneDrive · Nextcloud
+    </div>
+    <h2>3 &nbsp;Sincronização</h2>
+    <p>Google Drive · raul@gmail.com — memória, tarefas e arquivos cifrados no cliente antes de saírem da máquina. Conflitos nunca são decididos silenciosamente.</p>
+  </article>
+  <footer class="foot">
+    <span>/// agente · retomar · ajuda — orquestrador no rodapé do verbete</span>
+    <span>HostDrive · composição tipográfica contínua · ⌘K ⌘N ⌘,</span>
+  </footer>
+</main>
+<aside class="outer">
+  <b>RUNNING HEAD</b><br>HostDrive · 2026-11-10<br><br>
+  <b>FOLIO</b><br>§1/§3<br><br>
+  <b>ESTADO</b><br>sincronizado<br>contexto fresco
+</aside>
+</body>
+</html>

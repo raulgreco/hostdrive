@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root { --ink:#141414; --paper:#f4f2ee; --line:#d9d6cf; --blue:#1f4fd8; --orange:#ff5a1f; --green:#009b72; --violet:#6b2fb3; --amber:#e8a800; }
+  * { margin:0; box-sizing:border-box; }
+  body { width:1440px; height:900px; overflow:hidden; background:var(--paper); color:var(--ink); font-family:Archivo,sans-serif; display:grid; grid-template-columns:264px 96px 1fr; }
+  /* Sidebar: projects + connected agents */
+  aside { border-right:1px solid var(--line); padding:28px 22px; display:flex; flex-direction:column; gap:26px; background:#efece6; }
+  .brand { font-weight:700; font-size:15px; letter-spacing:.02em; display:flex; align-items:center; gap:10px; }
+  .brand i { width:14px; height:14px; background:var(--ink); display:inline-block; }
+  .cap { font-family:'IBM Plex Mono',monospace; font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:#8a867d; margin-bottom:10px; }
+  .proj { padding:9px 0; border-bottom:1px solid var(--line); display:grid; gap:2px; }
+  .proj b { font-size:13px; font-weight:600; } .proj span { font-size:10.5px; color:#8a867d; }
+  .proj.on { box-shadow:inset 3px 0 0 var(--ink); padding-left:10px; }
+  .agent { display:flex; align-items:baseline; gap:8px; padding:6px 0; font-size:12px; }
+  .agent small { font-family:'IBM Plex Mono',monospace; font-size:9px; color:#8a867d; margin-left:auto; }
+  /* Chip rail: the deck */
+  nav { display:flex; flex-direction:column; align-items:center; padding-top:40px; gap:14px; }
+  .chip { width:64px; height:88px; border-radius:9px; position:relative; box-shadow:0 1px 0 rgba(0,0,0,.18), inset 0 0 0 1px rgba(0,0,0,.06); }
+  .chip span { position:absolute; left:50%; transform:translateX(-50%); bottom:-16px; font-family:'IBM Plex Mono',monospace; font-size:8.5px; letter-spacing:.1em; color:#57534a; }
+  .chip.on { transform:translateY(-10px); outline:2px solid var(--ink); outline-offset:2px; }
+  .chip b { position:absolute; top:6px; left:8px; font-family:'IBM Plex Mono',monospace; font-size:8px; color:rgba(255,255,255,.85); }
+  /* Work area */
+  main { display:grid; grid-template-rows:64px 1fr 118px; }
+  header { display:flex; align-items:center; gap:18px; padding:0 30px; border-bottom:1px solid var(--line); }
+  header h1 { font-size:17px; font-weight:700; } header p { font-size:11px; color:#8a867d; }
+  .status { margin-left:auto; font-family:'IBM Plex Mono',monospace; font-size:10px; display:flex; gap:16px; align-items:center; }
+  .status b { background:var(--green); color:#fff; padding:3px 8px; border-radius:99px; font-weight:500; }
+  .term { margin:26px 30px 0; background:#101216; color:#d7dfe2; border-radius:12px; border-top:4px solid var(--blue); padding:18px 22px; font-family:'IBM Plex Mono',monospace; font-size:11.5px; line-height:1.75; }
+  .term .g { color:#42d7c1; } .term .d { color:#5b6770; }
+  .foot { padding:16px 30px; display:grid; gap:8px; align-content:start; }
+  .orch { display:flex; align-items:center; gap:10px; border:1px solid var(--line); background:#fff; border-radius:8px; padding:10px 14px; font-family:'IBM Plex Mono',monospace; font-size:11px; }
+  .orch i { color:var(--blue); font-style:normal; font-weight:600; }
+  .orch em { color:#a3a099; font-style:normal; }
+  .hint { font-family:'IBM Plex Mono',monospace; font-size:9.5px; color:#8a867d; letter-spacing:.06em; }
+</style>
+</head>
+<body>
+<aside>
+  <div class="brand"><i></i>HostDrive</div>
+  <section><div class="cap">Projetos — 3 abertos</div>
+    <div class="proj on"><b>hostdrive</b><span>~/Desktop/UNIVERSAL</span></div>
+    <div class="proj"><b>Sistema CPA</b><span>~/Projetos/cpa</span></div>
+    <div class="proj"><b>Portal interno</b><span>~/Projetos/portal</span></div>
+  </section>
+  <section style="margin-top:auto"><div class="cap">Agentes conectados</div>
+    <div class="agent">Codex<small>2 SESSÕES</small></div>
+    <div class="agent">Claude<small>1 SESSÃO</small></div>
+  </section>
+</aside>
+<nav aria-label="Ferramentas do projeto">
+  <div class="chip on" style="background:var(--blue)"><b>T-01</b><span>TERMINAL</span></div>
+  <div class="chip" style="background:var(--orange)"><b>H-02</b><span>HISTÓRICO</span></div>
+  <div class="chip" style="background:var(--green)"><b>M-03</b><span>MEMÓRIA</span></div>
+  <div class="chip" style="background:var(--violet)"><b>G-04</b><span>GIT</span></div>
+  <div class="chip" style="background:var(--amber)"><b>K-05</b><span>TAREFAS</span></div>
+</nav>
+<main>
+  <header>
+    <div><h1>hostdrive</h1><p>continuidade entre máquinas via Google Drive</p></div>
+    <div class="status"><span>Drive · raul@gmail.com</span><b>SINCRONIZADO</b></div>
+  </header>
+  <section class="term">
+    <div class="d">HostDrive — PTY pronto · contexto carregado de .hostdrive/contexto.md</div>
+    <div><span class="g">~/Desktop/UNIVERSAL/universal-ai-cli</span> git:(main) codex</div>
+    <div class="g">✓ Codex 0.154.0 iniciado com contexto do projeto</div>
+    <div>$ implementar sync multi-provedor</div>
+    <div class="d">lendo memória do projeto… 5 tarefas em aberto</div>
+  </section>
+  <footer class="foot">
+    <div class="orch"><i>///</i> agente claude <em>— troca o agente da aba sem tocar no stream</em></div>
+    <div class="hint">⌘K ORQUESTRADOR · ⌘N NOVO TERMINAL · CONTEXTO UNIVERSAL ENTRE CONVERSAS</div>
+  </footer>
+</main>
+</body>
+</html>

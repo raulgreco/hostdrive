@@ -1,4 +1,5 @@
 use crate::agents::{find_agent_executable, resume_args};
+use crate::context;
 use crate::projects::ProjectRepository;
 use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize};
 use serde::Serialize;
@@ -57,7 +58,7 @@ pub fn launch_terminal(
     rows: Option<u16>,
     resume: Option<bool>,
 ) -> Result<TerminalStarted, String> {
-    let executable = find_agent_executable(&agent_id)
+    let executable = find_agent_executable(&repository, &agent_id)
         .ok_or_else(|| format!("agente não instalado ou não permitido: {agent_id}"))?;
     let resumed = resume.unwrap_or(false);
     let resume_flags = if resumed {
@@ -69,12 +70,40 @@ pub fn launch_terminal(
         None
     };
     let cwd = canonical_working_directory(working_directory)?;
+    let cwd_string = cwd.to_string_lossy().into_owned();
+    let project_id = repository
+        .project_id_for_path(&cwd_string)
+        .map_err(|error| format!("falha ao localizar projeto: {error}"))?
+        .ok_or_else(|| "o diretório não pertence a um projeto ativo".to_string())?;
+
+    // Contexto universal entre conversas: mantém `.eureka42/contexto.md`
+    // fresco no projeto e injeta o agregado em novas sessões dos agentes
+    // com flag validada (hoje: Claude Code). Falha aqui nunca impede a
+    // sessão — contexto é auxiliar, o PTY é o produto.
+    let context_markdown = if repository.context_carryover_enabled().unwrap_or(false) {
+        let _ = context::write_context_file(&repository, &project_id);
+        if resumed {
+            None
+        } else {
+            context::build_project_context(&repository, &project_id)
+                .ok()
+                .map(|context| context.markdown)
+        }
+    } else {
+        None
+    };
+
     let pair = native_pty_system()
         .openpty(checked_size(cols, rows)?)
         .map_err(|error| format!("falha ao abrir PTY: {error}"))?;
     let mut command = CommandBuilder::new(executable);
     if let Some(flags) = resume_flags {
         command.args(flags);
+    }
+    if let Some(markdown) = context_markdown {
+        if let Some(flag) = context::context_injection_flag(&agent_id) {
+            command.args([flag, markdown.as_str()]);
+        }
     }
     command.cwd(&cwd);
     command.env("TERM", "xterm-256color");
@@ -94,11 +123,6 @@ pub fn launch_terminal(
         .map_err(|error| format!("falha ao abrir entrada do PTY: {error}"))?;
     let session_id = Uuid::new_v4().to_string();
     let output_session_id = session_id.clone();
-    let cwd_string = cwd.to_string_lossy().into_owned();
-    let project_id = repository
-        .project_id_for_path(&cwd_string)
-        .map_err(|error| format!("falha ao localizar projeto: {error}"))?
-        .ok_or_else(|| "o diretório não pertence a um projeto ativo".to_string())?;
     if let Err(error) = repository.record_session_started(
         &session_id,
         &project_id,
@@ -110,6 +134,7 @@ pub fn launch_terminal(
         return Err(format!("falha ao registrar sessão: {error}"));
     }
     let output_repository = repository.inner().clone();
+    let output_project_id = project_id.clone();
 
     thread::spawn(move || {
         let mut buffer = [0_u8; 8192];
@@ -138,6 +163,8 @@ pub fn launch_terminal(
             }
         }
         let _ = output_repository.mark_session_ended(&output_session_id, "EXITED");
+        // Fim de conversa: publica o contexto atualizado para a próxima.
+        let _ = context::write_context_file(&output_repository, &output_project_id);
         let _ = app.emit(
             "terminal-exited",
             TerminalExited {

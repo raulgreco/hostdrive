@@ -31,6 +31,11 @@ pub struct Project {
     /// docs/decisions/005-nextcloud-sync.md): histórico de terminal pode
     /// conter segredos colados durante a sessão.
     pub(crate) sync_terminal_history: bool,
+    /// Sync de arquivos do projeto (2026-11-10): opt-in explícito por
+    /// projeto — nunca ligado por padrão; repositórios podem ser grandes e
+    /// conter o que o usuário não quer na nuvem.
+    pub(crate) files_sync_enabled: bool,
+    pub(crate) files_last_sync_at: i64,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -50,10 +55,29 @@ pub struct SessionSummary {
     resumed: bool,
 }
 
+/// Agente personalizado registrado pelo usuário — qualquer executável
+/// resolvível no PATH. Ids são slugs únicos gerados em `agents.rs`.
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub struct AppSettings {
-    pub(crate) capture_terminal_events: bool,
+pub struct CustomAgent {
+    pub id: String,
+    pub label: String,
+    pub executable: String,
+}
+
+/// Linha agregada de `terminal_sessions`: um agente "conectado" é qualquer
+/// `agent_id` com ao menos uma sessão no projeto. A UI só mostra estes.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ConnectedAgentRow {
+    pub agent_id: String,
+    pub session_count: i64,
+    pub last_used_at: i64,
+    pub running: bool,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AppSettings {    pub(crate) capture_terminal_events: bool,
     pub(crate) retention_days: i64,
     /// NFR-006 — preferência de tema: "system" segue o SO, ou "light"/"dark"
     /// força a escolha manual.
@@ -65,6 +89,22 @@ pub struct AppSettings {
     pub(crate) nextcloud_url: String,
     pub(crate) nextcloud_username: String,
     pub(crate) nextcloud_sync_enabled: bool,
+    /// Contexto universal entre conversas (2026-11-10): quando ligado, o
+    /// HostDrive mantém `.eureka42/contexto.md` no diretório do projeto
+    /// atualizado e injeta o contexto em novas sessões dos agentes com flag
+    /// validada (hoje: Claude Code). Ligado por padrão — é o coração da
+    /// promessa de continuidade; usuário pode desligar na Configurações.
+    pub(crate) context_carryover_enabled: bool,
+    /// Provedor de nuvem escolhido (2026-11-10): "nextcloud" | "google" |
+    /// "onedrive". `nextcloud_sync_enabled` passa a significar "sincronização
+    /// cloud ativa" para o provedor escolhido.
+    pub(crate) cloud_provider: String,
+    /// Client IDs OAuth do usuário (Google Drive / OneDrive) — não são
+    /// segredo; vivem aqui. Tokens ficam só no chaveiro.
+    pub(crate) google_client_id: String,
+    pub(crate) onedrive_client_id: String,
+    /// E-mail da conta cloud conectada — mostrado na UI como identidade.
+    pub(crate) cloud_account: String,
 }
 
 impl ProjectRepository {
@@ -131,8 +171,7 @@ impl ProjectRepository {
                nextcloud_sync_enabled INTEGER NOT NULL DEFAULT 0
              );
              INSERT OR IGNORE INTO app_settings(id) VALUES(1);",
-        )?;
-        // Migração para bancos criados antes destas colunas existirem.
+        )?;        // Migração para bancos criados antes destas colunas existirem.
         // SQLite não suporta `ADD COLUMN IF NOT EXISTS`; ignoramos o erro
         // "duplicate column name" quando a coluna já existe.
         ensure_column(&connection, "terminal_sessions", "resumed", "INTEGER NOT NULL DEFAULT 0")?;
@@ -143,6 +182,13 @@ impl ProjectRepository {
         ensure_column(&connection, "projects", "nextcloud_sync_id", "TEXT")?;
         ensure_column(&connection, "projects", "last_synced_at", "INTEGER NOT NULL DEFAULT 0")?;
         ensure_column(&connection, "projects", "sync_terminal_history", "INTEGER NOT NULL DEFAULT 0")?;
+        ensure_column(&connection, "projects", "files_sync_enabled", "INTEGER NOT NULL DEFAULT 0")?;
+        ensure_column(&connection, "projects", "files_last_sync_at", "INTEGER NOT NULL DEFAULT 0")?;
+        ensure_column(&connection, "app_settings", "context_carryover_enabled", "INTEGER NOT NULL DEFAULT 1")?;
+        ensure_column(&connection, "app_settings", "cloud_provider", "TEXT NOT NULL DEFAULT 'nextcloud'")?;
+        ensure_column(&connection, "app_settings", "google_client_id", "TEXT NOT NULL DEFAULT ''")?;
+        ensure_column(&connection, "app_settings", "onedrive_client_id", "TEXT NOT NULL DEFAULT ''")?;
+        ensure_column(&connection, "app_settings", "cloud_account", "TEXT NOT NULL DEFAULT ''")?;
         connection.execute_batch(
             "CREATE TABLE IF NOT EXISTS project_memory (
                project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -173,7 +219,13 @@ impl ProjectRepository {
                package_path TEXT NOT NULL,
                created_at INTEGER NOT NULL
              );
-             CREATE INDEX IF NOT EXISTS idx_handoffs_project ON handoffs(project_id,created_at DESC);",
+             CREATE INDEX IF NOT EXISTS idx_handoffs_project ON handoffs(project_id,created_at DESC);
+             CREATE TABLE IF NOT EXISTS custom_agents (
+               id TEXT PRIMARY KEY NOT NULL,
+               label TEXT NOT NULL,
+               executable TEXT NOT NULL,
+               created_at INTEGER NOT NULL
+             );",
         )?;
         connection.execute(
             "UPDATE terminal_sessions SET status='INTERRUPTED',ended_at=?1 WHERE status='RUNNING'",
@@ -202,6 +254,16 @@ impl ProjectRepository {
             .parent()
             .unwrap_or(Path::new("."))
             .join("exports")
+    }
+
+    /// Manifestos locais do sync de arquivos (`<sync_id>.files.json`) — o
+    /// estado combinado da última sincronização, usado para detectar o que
+    /// mudou de um lado e de outro.
+    pub(crate) fn manifest_root(&self) -> PathBuf {
+        self.database_path
+            .parent()
+            .unwrap_or(Path::new("."))
+            .join("file_manifests")
     }
 
     pub(crate) fn project_id_for_path(
@@ -267,6 +329,43 @@ impl ProjectRepository {
         Ok(())
     }
 
+    /// Sync de arquivos do projeto — opt-in explícito por projeto.
+    pub(crate) fn set_project_files_sync(
+        &self,
+        project_id: &str,
+        enabled: bool,
+    ) -> Result<(), rusqlite::Error> {
+        let changed = self.open()?.execute(
+            "UPDATE projects SET files_sync_enabled=?1 WHERE id=?2",
+            params![enabled, project_id],
+        )?;
+        if changed == 0 {
+            return Err(rusqlite::Error::QueryReturnedNoRows);
+        }
+        Ok(())
+    }
+
+    pub(crate) fn mark_project_files_synced(
+        &self,
+        project_id: &str,
+        synced_at: i64,
+    ) -> Result<(), rusqlite::Error> {
+        self.open()?.execute(
+            "UPDATE projects SET files_last_sync_at=?1 WHERE id=?2",
+            params![synced_at, project_id],
+        )?;
+        Ok(())
+    }
+
+    /// Guarda o e-mail da conta cloud conectada (identidade entre máquinas).
+    pub(crate) fn set_cloud_account(&self, account: &str) -> Result<(), rusqlite::Error> {
+        self.open()?.execute(
+            "UPDATE app_settings SET cloud_account=?1 WHERE id=1",
+            params![account],
+        )?;
+        Ok(())
+    }
+
     pub(crate) fn record_session_started(
         &self,
         id: &str,
@@ -323,6 +422,91 @@ impl ProjectRepository {
             [],
             |row| row.get(0),
         )
+    }
+
+    pub(crate) fn list_custom_agents(&self) -> Result<Vec<CustomAgent>, rusqlite::Error> {
+        let connection = self.open()?;
+        let mut statement =
+            connection.prepare("SELECT id,label,executable FROM custom_agents ORDER BY label")?;
+        let rows = statement.query_map([], |row| {
+            Ok(CustomAgent {
+                id: row.get(0)?,
+                label: row.get(1)?,
+                executable: row.get(2)?,
+            })
+        })?;
+        rows.collect()
+    }
+
+    pub(crate) fn insert_custom_agent(
+        &self,
+        id: &str,
+        label: &str,
+        executable: &str,
+    ) -> Result<(), rusqlite::Error> {
+        self.open()?.execute(
+            "INSERT INTO custom_agents(id,label,executable,created_at) VALUES(?1,?2,?3,?4)",
+            params![id, label, executable, unix_timestamp().unwrap_or_default()],
+        )?;
+        Ok(())
+    }
+
+    pub(crate) fn delete_custom_agent(&self, id: &str) -> Result<(), rusqlite::Error> {
+        let changed = self
+            .open()?
+            .execute("DELETE FROM custom_agents WHERE id=?1", params![id])?;
+        if changed == 0 {
+            return Err(rusqlite::Error::QueryReturnedNoRows);
+        }
+        Ok(())
+    }
+
+    /// Contexto universal entre conversas ligado? (ver campo em `AppSettings`.)
+    pub(crate) fn context_carryover_enabled(&self) -> Result<bool, rusqlite::Error> {
+        self.open()?.query_row(
+            "SELECT context_carryover_enabled FROM app_settings WHERE id=1",
+            [],
+            |row| row.get(0),
+        )
+    }
+
+    pub(crate) fn set_context_carryover_enabled(
+        &self,
+        enabled: bool,
+    ) -> Result<(), rusqlite::Error> {
+        self.open()?.execute(
+            "UPDATE app_settings SET context_carryover_enabled=?1 WHERE id=1",
+            params![enabled],
+        )?;
+        Ok(())
+    }
+
+    /// Agregação por agente das sessões de um projeto — é o que define quem
+    /// "aparece" na UI: só agente com sessão registrada. `running` reflete
+    /// se há sessão com status RUNNING neste momento.
+    pub(crate) fn list_connected_agents(
+        &self,
+        project_id: &str,
+    ) -> Result<Vec<ConnectedAgentRow>, rusqlite::Error> {
+        let connection = self.open()?;
+        let mut statement = connection.prepare(
+            "SELECT agent_id,COUNT(*),MAX(started_at),
+                    COALESCE(SUM(CASE WHEN status='RUNNING' THEN 1 ELSE 0 END),0)
+             FROM terminal_sessions
+             WHERE project_id=?1
+             GROUP BY agent_id
+             ORDER BY MAX(started_at) DESC",
+        )?;
+        let rows = statement.query_map([project_id], |row| {
+            let running: i64 = row.get(3)?;
+            Ok(ConnectedAgentRow {
+                agent_id: row.get(0)?,
+                session_count: row.get(1)?,
+                last_used_at: row.get(2)?,
+                running: running > 0,
+            })
+        })?;
+        rows.collect()
     }
 }
 
@@ -394,6 +578,17 @@ pub fn set_project_terminal_sync(
 }
 
 #[tauri::command]
+pub fn set_project_files_sync(
+    repository: State<'_, ProjectRepository>,
+    project_id: String,
+    enabled: bool,
+) -> Result<(), String> {
+    repository
+        .set_project_files_sync(&project_id, enabled)
+        .map_err(database_error)
+}
+
+#[tauri::command]
 pub fn list_terminal_sessions(
     repository: State<'_, ProjectRepository>,
     project_id: String,
@@ -432,6 +627,11 @@ pub fn update_app_settings(
     nextcloud_url: String,
     nextcloud_username: String,
     nextcloud_sync_enabled: bool,
+    context_carryover_enabled: bool,
+    cloud_provider: String,
+    google_client_id: String,
+    onedrive_client_id: String,
+    cloud_account: String,
 ) -> Result<AppSettings, String> {
     write_app_settings(
         &repository,
@@ -441,6 +641,11 @@ pub fn update_app_settings(
         nextcloud_url,
         nextcloud_username,
         nextcloud_sync_enabled,
+        context_carryover_enabled,
+        cloud_provider,
+        google_client_id,
+        onedrive_client_id,
+        cloud_account,
     )
     .map_err(|error| error.to_string())
 }
@@ -542,7 +747,7 @@ fn fts_query(input: &str) -> String {
 
 pub(crate) fn read_app_settings(repository: &ProjectRepository) -> Result<AppSettings, rusqlite::Error> {
     repository.open()?.query_row(
-        "SELECT capture_terminal_events,retention_days,theme,nextcloud_url,nextcloud_username,nextcloud_sync_enabled FROM app_settings WHERE id=1",
+        "SELECT capture_terminal_events,retention_days,theme,nextcloud_url,nextcloud_username,nextcloud_sync_enabled,context_carryover_enabled,cloud_provider,google_client_id,onedrive_client_id,cloud_account FROM app_settings WHERE id=1",
         [],
         |row| {
             Ok(AppSettings {
@@ -552,12 +757,18 @@ pub(crate) fn read_app_settings(repository: &ProjectRepository) -> Result<AppSet
                 nextcloud_url: row.get(3)?,
                 nextcloud_username: row.get(4)?,
                 nextcloud_sync_enabled: row.get(5)?,
+                context_carryover_enabled: row.get(6)?,
+                cloud_provider: row.get(7)?,
+                google_client_id: row.get(8)?,
+                onedrive_client_id: row.get(9)?,
+                cloud_account: row.get(10)?,
             })
         },
     )
 }
 
 const VALID_THEMES: [&str; 3] = ["system", "light", "dark"];
+const VALID_CLOUD_PROVIDERS: [&str; 3] = ["nextcloud", "google", "onedrive"];
 
 #[allow(clippy::too_many_arguments)]
 fn write_app_settings(
@@ -568,6 +779,11 @@ fn write_app_settings(
     nextcloud_url: String,
     nextcloud_username: String,
     nextcloud_sync_enabled: bool,
+    context_carryover_enabled: bool,
+    cloud_provider: String,
+    google_client_id: String,
+    onedrive_client_id: String,
+    cloud_account: String,
 ) -> Result<AppSettings, Box<dyn std::error::Error>> {
     if !(1..=3650).contains(&retention_days) {
         return Err("retenção deve ficar entre 1 e 3650 dias".into());
@@ -575,12 +791,15 @@ fn write_app_settings(
     if !VALID_THEMES.contains(&theme.as_str()) {
         return Err("tema inválido: use system, light ou dark".into());
     }
+    if !VALID_CLOUD_PROVIDERS.contains(&cloud_provider.as_str()) {
+        return Err("provedor de nuvem inválido: use nextcloud, google ou onedrive".into());
+    }
     if nextcloud_sync_enabled && (nextcloud_url.trim().is_empty() || nextcloud_username.trim().is_empty()) {
         return Err("informe o endereço do servidor e o usuário do Nextcloud antes de ativar a sincronização".into());
     }
     repository.open()?.execute(
-        "UPDATE app_settings SET capture_terminal_events=?1,retention_days=?2,theme=?3,nextcloud_url=?4,nextcloud_username=?5,nextcloud_sync_enabled=?6 WHERE id=1",
-        params![capture_terminal_events, retention_days, theme, nextcloud_url.trim(), nextcloud_username.trim(), nextcloud_sync_enabled],
+        "UPDATE app_settings SET capture_terminal_events=?1,retention_days=?2,theme=?3,nextcloud_url=?4,nextcloud_username=?5,nextcloud_sync_enabled=?6,context_carryover_enabled=?7,cloud_provider=?8,google_client_id=?9,onedrive_client_id=?10,cloud_account=?11 WHERE id=1",
+        params![capture_terminal_events, retention_days, theme, nextcloud_url.trim(), nextcloud_username.trim(), nextcloud_sync_enabled, context_carryover_enabled, cloud_provider, google_client_id.trim(), onedrive_client_id.trim(), cloud_account.trim()],
     )?;
     Ok(read_app_settings(repository)?)
 }
@@ -637,7 +856,7 @@ fn update_flag(
     Ok(())
 }
 
-const PROJECT_COLUMNS: &str = "id,name,path,is_favorite,is_archived,created_at,last_opened_at,nextcloud_sync_id,last_synced_at,sync_terminal_history";
+const PROJECT_COLUMNS: &str = "id,name,path,is_favorite,is_archived,created_at,last_opened_at,nextcloud_sync_id,last_synced_at,sync_terminal_history,files_sync_enabled,files_last_sync_at";
 
 fn project_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Project> {
     Ok(Project {
@@ -651,6 +870,8 @@ fn project_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Project> {
         nextcloud_sync_id: row.get(7)?,
         last_synced_at: row.get(8)?,
         sync_terminal_history: row.get(9)?,
+        files_sync_enabled: row.get(10)?,
+        files_last_sync_at: row.get(11)?,
     })
 }
 
@@ -758,6 +979,9 @@ mod tests {
         assert!(initial.capture_terminal_events);
         assert_eq!(initial.theme, "dark");
         assert!(!initial.nextcloud_sync_enabled);
+        // Contexto entre conversas vem ligado por padrão (promessa central
+        // do produto); usuário pode desligar explicitamente.
+        assert!(initial.context_carryover_enabled);
         let changed = write_app_settings(
             &repository,
             false,
@@ -766,16 +990,23 @@ mod tests {
             String::new(),
             String::new(),
             false,
+            false,
+            "nextcloud".into(),
+            String::new(),
+            String::new(),
+            String::new(),
         )
         .unwrap();
         assert!(!changed.capture_terminal_events);
         assert_eq!(changed.retention_days, 30);
         assert_eq!(changed.theme, "light");
+        assert!(!changed.context_carryover_enabled);
         assert!(!repository.should_capture_terminal_events().unwrap());
-        assert!(write_app_settings(&repository, true, 0, "light".into(), String::new(), String::new(), false).is_err());
-        assert!(write_app_settings(&repository, true, 30, "neon".into(), String::new(), String::new(), false).is_err());
+        assert!(write_app_settings(&repository, true, 0, "light".into(), String::new(), String::new(), false, true, "nextcloud".into(), String::new(), String::new(), String::new()).is_err());
+        assert!(write_app_settings(&repository, true, 30, "neon".into(), String::new(), String::new(), false, true, "nextcloud".into(), String::new(), String::new(), String::new()).is_err());
+        assert!(write_app_settings(&repository, true, 30, "dark".into(), String::new(), String::new(), false, true, "dropbox".into(), String::new(), String::new(), String::new()).is_err());
         // Não pode ativar a sincronização sem URL/usuário do Nextcloud configurados.
-        assert!(write_app_settings(&repository, true, 30, "dark".into(), String::new(), String::new(), true).is_err());
+        assert!(write_app_settings(&repository, true, 30, "dark".into(), String::new(), String::new(), true, true, "nextcloud".into(), String::new(), String::new(), String::new()).is_err());
         let synced = write_app_settings(
             &repository,
             true,
@@ -784,10 +1015,66 @@ mod tests {
             "https://nextcloud.example.com".into(),
             "raul".into(),
             true,
+            true,
+            "google".into(),
+            "id-do-cliente.apps.googleusercontent.com".into(),
+            String::new(),
+            "raul@gmail.com".into(),
         )
         .unwrap();
         assert!(synced.nextcloud_sync_enabled);
         assert_eq!(synced.nextcloud_url, "https://nextcloud.example.com");
+        assert_eq!(synced.cloud_provider, "google");
+        assert_eq!(synced.cloud_account, "raul@gmail.com");
+    }
+
+    #[test]
+    fn aggregates_connected_agents_per_project() {
+        let (directory, repository) = repository();
+        let workspace = directory.path().join("workspace-connected");
+        std::fs::create_dir(&workspace).unwrap();
+        let project = add(&repository, &workspace).unwrap();
+        for (session, agent) in [("s-1", "codex"), ("s-2", "codex"), ("s-3", "claude")] {
+            repository
+                .record_session_started(session, &project.id, agent, project.path.as_str(), false)
+                .unwrap();
+        }
+        repository.mark_session_ended("s-3", "EXITED").unwrap();
+
+        let connected = repository.list_connected_agents(&project.id).unwrap();
+        assert_eq!(connected.len(), 2);
+        // Ordenação é por uso mais recente; sessões criadas no mesmo segundo
+        // empatam em `started_at`, então compare sem depender da ordem.
+        let by_id = |id: &str| connected.iter().find(|row| row.agent_id == id).unwrap();
+        let claude = by_id("claude");
+        assert_eq!(claude.session_count, 1);
+        assert!(!claude.running);
+        let codex = by_id("codex");
+        assert_eq!(codex.session_count, 2);
+        // s-1 e s-2 seguem RUNNING (nunca foram encerradas).
+        assert!(codex.running);
+
+        // Outro projeto não enxerga as sessões deste.
+        let other_workspace = directory.path().join("workspace-other");
+        std::fs::create_dir(&other_workspace).unwrap();
+        let other = add(&repository, &other_workspace).unwrap();
+        assert!(repository.list_connected_agents(&other.id).unwrap().is_empty());
+    }
+
+    #[test]
+    fn custom_agents_round_trip_and_delete() {
+        let (_directory, repository) = repository();
+        repository.insert_custom_agent("mycli", "Minha CLI", "mycli").unwrap();
+        repository
+            .insert_custom_agent("curl", "cURL", "curl")
+            .unwrap();
+        let customs = repository.list_custom_agents().unwrap();
+        assert_eq!(customs.len(), 2);
+        assert!(customs.iter().any(|custom| custom.id == "mycli"));
+        assert!(customs.iter().any(|custom| custom.id == "curl"));
+        repository.delete_custom_agent("curl").unwrap();
+        assert_eq!(repository.list_custom_agents().unwrap().len(), 1);
+        assert!(repository.delete_custom_agent("curl").is_err());
     }
 
     /// NFR-008 — mede a busca FTS5 contra um dataset sintético realista em

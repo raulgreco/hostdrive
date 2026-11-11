@@ -54,7 +54,7 @@ export const OrchestratorBar = forwardRef<OrchestratorBarHandle, Props>(function
 
   const paletteMatch = /^\/\/\/(agente|agent)\b\s*(.*)$/i.exec(value.trimStart());
   const suggestions = paletteMatch
-    ? agents.filter((agent) => agent.available && agent.id !== activeAgentId && `${agent.id} ${agent.label}`.toLocaleLowerCase().includes(paletteMatch[2].trim().toLocaleLowerCase()))
+    ? agents.filter((agent) => agent.available && agent.id !== activeAgentId && `${agent.id} ${agent.label} ${agent.executable ?? ""}`.toLocaleLowerCase().includes(paletteMatch[2].trim().toLocaleLowerCase()))
     : [];
 
   function applySwitch(agentId: string) {

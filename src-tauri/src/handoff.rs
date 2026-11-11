@@ -30,7 +30,7 @@ pub fn prepare_handoff(
     if source_agent == target_agent {
         return Err("selecione um agente de destino diferente".into());
     }
-    if find_agent_executable(&target_agent).is_none() {
+    if find_agent_executable(&repository, &target_agent).is_none() {
         return Err(format!("agente de destino não instalado: {target_agent}"));
     }
     let project_path = repository.project_path(&project_id).map_err(db_error)?;

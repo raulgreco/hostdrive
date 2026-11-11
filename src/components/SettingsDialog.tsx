@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { getAppSettings, updateAppSettings, type AppSettings, type ThemePreference } from "../services/settings";
-import { clearNextcloudCredentials, hasNextcloudCredentials, setNextcloudCredentials, testNextcloudConnection } from "../services/sync";
+import { clearNextcloudCredentials, connectCloud, disconnectCloud, getCloudStatus, hasNextcloudCredentials, setNextcloudCredentials, testCloudConnection, type CloudStatus } from "../services/sync";
 import { isTauriRuntime } from "../services/terminal";
 
-const defaults: AppSettings = { captureTerminalEvents: true, retentionDays: 90, theme: "dark", nextcloudUrl: "", nextcloudUsername: "", nextcloudSyncEnabled: false };
+const defaults: AppSettings = { captureTerminalEvents: true, retentionDays: 90, theme: "dark", nextcloudUrl: "", nextcloudUsername: "", nextcloudSyncEnabled: false, contextCarryoverEnabled: true, cloudProvider: "nextcloud", googleClientId: "", onedriveClientId: "", cloudAccount: "" };
 
 const SHORTCUTS: Array<{ keys: string; description: string }> = [
   { keys: "⌘/Ctrl + K", description: "Focar o comando do orquestrador (///agente, ///retomar) no terminal ativo" },
@@ -12,23 +12,31 @@ const SHORTCUTS: Array<{ keys: string; description: string }> = [
   { keys: "Esc", description: "Fechar a janela em foco (Configurações, Transferir contexto, detalhes de sessão)" }
 ];
 
+const PROVIDERS = [
+  { id: "nextcloud", label: "Nextcloud" },
+  { id: "google", label: "Google Drive" },
+  { id: "onedrive", label: "OneDrive" }
+] as const;
+
 export function SettingsDialog({ open, onClose, onSettingsSaved }: { open: boolean; onClose(): void; onSettingsSaved?(settings: AppSettings): void }) {
   const [settings, setSettings] = useState(defaults);
-  const [section, setSection] = useState<"account" | "privacy" | "general" | "nextcloud">("account");
+  const [section, setSection] = useState<"account" | "privacy" | "general" | "cloud">("account");
   const [status, setStatus] = useState<"idle" | "loading" | "saving" | "saved" | "error">("idle");
+  const [cloudStatus, setCloudStatus] = useState<CloudStatus | null>(null);
   const [credentialsConfigured, setCredentialsConfigured] = useState<boolean | null>(null);
   const [appPassword, setAppPassword] = useState("");
   const [passphrase, setPassphrase] = useState("");
   const [passphraseConfirm, setPassphraseConfirm] = useState("");
   const [credentialStatus, setCredentialStatus] = useState("");
   const [connectionStatus, setConnectionStatus] = useState("");
+  const [oauthBusy, setOauthBusy] = useState(false);
 
   useEffect(() => {
     if (!open || !isTauriRuntime()) return;
     let current = true;
     setStatus("loading");
-    Promise.all([getAppSettings(), hasNextcloudCredentials()]).then(([value, configured]) => {
-      if (current) { setSettings(value); setCredentialsConfigured(configured); setStatus("idle"); }
+    Promise.all([getAppSettings(), hasNextcloudCredentials(), getCloudStatus().catch(() => null)]).then(([value, configured, cloud]) => {
+      if (current) { setSettings(value); setCredentialsConfigured(configured); setCloudStatus(cloud); setStatus("idle"); }
     }).catch(() => { if (current) setStatus("error"); });
     return () => { current = false; };
   }, [open]);
@@ -49,11 +57,7 @@ export function SettingsDialog({ open, onClose, onSettingsSaved }: { open: boole
 
   function setTheme(theme: ThemePreference) { setSettings((current) => ({ ...current, theme })); }
 
-  // Salva endereço/usuário/toggle (SQLite) e credenciais (chaveiro) juntos,
-  // num único clique — antes eram dois botões separados e era fácil salvar
-  // só um dos dois, deixando "Nextcloud não configurado" mesmo depois de
-  // preencher a tela inteira.
-  async function saveNextcloudSection() {
+  async function saveCloudSection() {
     if (!isTauriRuntime()) return;
     if (passphrase && passphrase !== passphraseConfirm) { setCredentialStatus("As duas frases de criptografia digitadas são diferentes."); return; }
     setCredentialStatus("Salvando…");
@@ -66,66 +70,116 @@ export function SettingsDialog({ open, onClose, onSettingsSaved }: { open: boole
         setAppPassword(""); setPassphrase(""); setPassphraseConfirm("");
         setCredentialsConfigured(true);
       }
-      setCredentialStatus("Configuração do Nextcloud salva: endereço, usuário" + (appPassword || passphrase ? " e credenciais" : "") + ".");
+      setCredentialStatus("Configuração da nuvem salva.");
+      setCloudStatus(await getCloudStatus());
+    } catch (error) { setCredentialStatus(String(error)); }
+  }
+
+  async function connectAccount() {
+    if (!isTauriRuntime()) return;
+    setOauthBusy(true);
+    setCredentialStatus("Abrindo o navegador para login…");
+    try {
+      // Salva o Client ID escolhido antes de abrir o OAuth.
+      const saved = await updateAppSettings(settings);
+      setSettings(saved);
+      const account = await connectCloud();
+      setCredentialStatus(`Conta conectada: ${account}.`);
+      setCloudStatus(await getCloudStatus());
+      setSettings((current) => ({ ...current, cloudAccount: account }));
+    } catch (error) { setCredentialStatus(String(error)); }
+    finally { setOauthBusy(false); }
+  }
+
+  async function disconnectAccount() {
+    setCredentialStatus("Desconectando…");
+    try {
+      await disconnectCloud();
+      setCredentialStatus("Conta desconectada — os tokens foram removidos do chaveiro.");
+      setCloudStatus(await getCloudStatus());
+      setSettings((current) => ({ ...current, cloudAccount: "" }));
     } catch (error) { setCredentialStatus(String(error)); }
   }
 
   async function removeCredentials() {
     setCredentialStatus("Removendo…");
-    try { await clearNextcloudCredentials(); setCredentialsConfigured(false); setCredentialStatus("Credenciais removidas do chaveiro do sistema."); }
+    try { await clearNextcloudCredentials(); setCredentialsConfigured(false); setCloudStatus(await getCloudStatus()); setCredentialStatus("Credenciais do Nextcloud removidas do chaveiro do sistema."); }
     catch (error) { setCredentialStatus(String(error)); }
   }
 
   async function testConnection() {
     setConnectionStatus("Testando…");
-    try { setConnectionStatus(await testNextcloudConnection()); }
+    try { setConnectionStatus(await testCloudConnection()); }
     catch (error) { setConnectionStatus(String(error)); }
   }
 
   if (!open) return null;
+  const usingNextcloud = settings.cloudProvider === "nextcloud";
+  const oauthProvider = settings.cloudProvider === "google"
+    ? { clientIdKey: "googleClientId" as const, name: "Google Drive", guide: "console.cloud.google.com → APIs e serviços → Tela de permissão OAuth (Externo, app próprio) → Credenciais → Criar ID do cliente → App para computador. Escopos não precisam ser configurados manualmente — o Eureka42 pede drive.appdata + e-mail no login." }
+    : { clientIdKey: "onedriveClientId" as const, name: "OneDrive", guide: "entra.microsoft.com → Entra ID (ou Registros de aplicativo) → Novo registro → Plataforma → Aplicativo móvel e desktop → URI de redirecionamento http://127.0.0.1 → copie o ID do aplicativo (cliente). Escopos não precisam ser configurados manualmente — o Eureka42 pede Files.ReadWrite.AppFolder + e-mail no login." };
+
   return <div className="settings-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <section className="settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title">
-      <header><div><span>HostDrive</span><h2 id="settings-title">Configurações</h2></div><button className="settings-close" onClick={onClose} aria-label="Fechar configurações">×</button></header>
+      <header><div><span>Eureka42</span><h2 id="settings-title">Configurações</h2></div><button className="settings-close" onClick={onClose} aria-label="Fechar configurações">×</button></header>
       <div className="settings-body">
         <nav aria-label="Seções das configurações">
           <button className={section === "account" ? "active" : ""} onClick={() => setSection("account")}>Conta</button>
           <button className={section === "privacy" ? "active" : ""} onClick={() => setSection("privacy")}>Privacidade</button>
-          <button className={section === "nextcloud" ? "active" : ""} onClick={() => setSection("nextcloud")}>Nextcloud</button>
+          <button className={section === "cloud" ? "active" : ""} onClick={() => setSection("cloud")}>Nuvem</button>
           <button className={section === "general" ? "active" : ""} onClick={() => setSection("general")}>Geral</button>
         </nav>
         <div className="settings-content">
           {section === "account" ? <>
             <div className="local-profile"><div className="profile-mark">L</div><div><strong>Modo local</strong><p>Nenhuma conta é necessária. Seus agentes e dados permanecem neste computador.</p></div><span>ATIVO</span></div>
-            <div className="settings-card"><div><strong>Continuar em outro computador</strong><p>Memória, tarefas, pacotes de transferência e preferências podem sincronizar via o seu próprio Nextcloud — sem conta nossa, sem servidor nosso.</p></div><button className="secondary-button" onClick={() => setSection("nextcloud")}>Configurar Nextcloud</button></div>
-            <p className="settings-note">O código continua sendo sincronizado pelo seu provedor Git. Credenciais dos agentes (Codex, Claude, OpenCode, Kimi) nunca são tocadas pelo HostDrive.</p>
+            <div className="settings-card"><div><strong>Continuar em outro computador</strong><p>Memória, tarefas, contexto, histórico e arquivos do projeto podem sincronizar pela sua própria nuvem — Google Drive, OneDrive ou Nextcloud. Mesma conta em outra máquina = mesmo trabalho, sem servidor nosso.</p></div><button className="secondary-button" onClick={() => setSection("cloud")}>Configurar nuvem</button></div>
+            <p className="settings-note">O código continua sendo sincronizado pelo seu provedor Git. Credenciais dos agentes nunca são tocadas pelo HostDrive.</p>
           </> : null}
           {section === "privacy" ? <>
-            <h3>Histórico local</h3>
+            <h3>Contexto entre conversas</h3>
+            <label className="settings-toggle"><div><strong>Carregar contexto de uma conversa para outra</strong><p>Mantém <code>.eureka42/contexto.md</code> no projeto atualizado (memória + tarefas + conversas recentes) e injeta esse contexto nas novas sessões do Claude Code — validado via <code>--append-system-prompt</code>.</p></div><input type="checkbox" checked={settings.contextCarryoverEnabled} onChange={(event) => setSettings((current) => ({ ...current, contextCarryoverEnabled: event.target.checked }))} /></label>
+            <p className="settings-note">Nos demais agentes, o contexto fica disponível no arquivo — aponte ou cole no início da conversa. Nenhum conteúdo capturado do terminal entra no contexto.</p>
+            <h3 className="settings-section-gap">Histórico local</h3>
             <label className="settings-toggle"><div><strong>Capturar eventos do terminal</strong><p>Salva entrada e saída brutas no SQLite local para histórico e retomada.</p></div><input type="checkbox" checked={settings.captureTerminalEvents} onChange={(event) => setSettings((current) => ({ ...current, captureTerminalEvents: event.target.checked }))} /></label>
             <label className="settings-field"><span>Retenção planejada</span><select value={settings.retentionDays} onChange={(event) => setSettings((current) => ({ ...current, retentionDays: Number(event.target.value) }))}><option value={30}>30 dias</option><option value={90}>90 dias</option><option value={365}>1 ano</option><option value={3650}>Sem limpeza automática</option></select></label>
             <p className="settings-note">A retenção já é salva como preferência; a limpeza automática será ativada em uma etapa posterior.</p>
           </> : null}
-          {section === "nextcloud" ? <>
-            <h3>Sincronização via Nextcloud</h3>
-            <p className="settings-note">Envia memória, tarefas, pacotes de transferência (UAHP) e preferências para uma pasta no seu Nextcloud, cifrados antes de saírem deste computador — nem quem administra o servidor vê o conteúdo. Histórico de terminal fica de fora por padrão (pode conter segredos); ative por projeto, individualmente, se quiser.</p>
-            <label className="settings-toggle"><div><strong>Ativar sincronização</strong><p>Ao abrir um projeto, traz dados mais novos do Nextcloud; ao trocar de projeto ou fechar o app, envia o que mudou aqui.</p></div><input type="checkbox" checked={settings.nextcloudSyncEnabled} onChange={(event) => setSettings((current) => ({ ...current, nextcloudSyncEnabled: event.target.checked }))} /></label>
-            <label className="settings-field"><span>Endereço do servidor</span><input className="settings-text-input" value={settings.nextcloudUrl} onChange={(event) => setSettings((current) => ({ ...current, nextcloudUrl: event.target.value }))} placeholder="https://nuvem.exemplo.com" /></label>
-            <label className="settings-field"><span>Usuário</span><input className="settings-text-input" value={settings.nextcloudUsername} onChange={(event) => setSettings((current) => ({ ...current, nextcloudUsername: event.target.value }))} placeholder="raul" /></label>
+          {section === "cloud" ? <>
+            <h3>Sincronização via nuvem</h3>
+            <p className="settings-note">Escolha <em>uma</em> nuvem — a conta que você já tem é a identidade: ao abrir o Eureka42 em outro computador com a mesma conta e sincronizar, você recupera histórico, contexto e arquivos dos projetos. Tudo é cifrado antes de sair desta máquina; nem o provedor vê o conteúdo. Histórico de terminal e arquivos de projeto ficam de fora por padrão (ative por projeto).</p>
+            <div className="theme-picker" role="radiogroup" aria-label="Provedor de nuvem">
+              {PROVIDERS.map((provider) => <button key={provider.id} role="radio" aria-checked={settings.cloudProvider === provider.id} className={settings.cloudProvider === provider.id ? "theme-option theme-option--active" : "theme-option"} onClick={() => setSettings((current) => ({ ...current, cloudProvider: provider.id }))}>{provider.label}</button>)}
+            </div>
+            <label className="settings-toggle"><div><strong>Ativar sincronização</strong><p>Ao abrir um projeto, traz dados mais novos da nuvem; ao trocar de projeto ou fechar o app, envia o que mudou aqui.</p></div><input type="checkbox" checked={settings.nextcloudSyncEnabled} onChange={(event) => setSettings((current) => ({ ...current, nextcloudSyncEnabled: event.target.checked }))} /></label>
+            {usingNextcloud ? <>
+              <label className="settings-field"><span>Endereço do servidor</span><input className="settings-text-input" value={settings.nextcloudUrl} onChange={(event) => setSettings((current) => ({ ...current, nextcloudUrl: event.target.value }))} placeholder="https://nuvem.exemplo.com" /></label>
+              <label className="settings-field"><span>Usuário</span><input className="settings-text-input" value={settings.nextcloudUsername} onChange={(event) => setSettings((current) => ({ ...current, nextcloudUsername: event.target.value }))} placeholder="raul" /></label>
+            </> : <>
+              <p className="settings-note"><strong>Como obter o Client ID ({oauthProvider.name}):</strong> {oauthProvider.guide}</p>
+              <label className="settings-field"><span>Client ID</span><input className="settings-text-input" value={settings[oauthProvider.clientIdKey]} onChange={(event) => setSettings((current) => ({ ...current, [oauthProvider.clientIdKey]: event.target.value }))} placeholder={settings.cloudProvider === "google" ? "xxxx.apps.googleusercontent.com" : "00000000-0000-0000-0000-000000000000"} /></label>
+              <div className="settings-card">
+                <div><strong>{cloudStatus?.configured && settings.cloudAccount ? `Conta conectada: ${settings.cloudAccount}` : "Conta não conectada nesta máquina."}</strong><p>O login abre no navegador; os tokens ficam só no chaveiro do sistema.</p></div>
+                <div className="settings-card-actions">
+                  {cloudStatus?.configured ? <button className="secondary-button" onClick={() => void disconnectAccount()}>Desconectar</button> : null}
+                  <button className="primary-button" onClick={() => void connectAccount()} disabled={oauthBusy || !settings[oauthProvider.clientIdKey].trim()}>{oauthBusy ? "Aguardando login…" : "Conectar conta"}</button>
+                </div>
+              </div>
+            </>}
             <h3 className="settings-section-gap">Credenciais (ficam só no chaveiro do sistema)</h3>
-            <p className="settings-note">{credentialsConfigured ? "Senha de app e frase de criptografia já configuradas nesta máquina." : "Ainda não configuradas nesta máquina."} A frase de criptografia é diferente da senha do Nextcloud — ela nunca é enviada a lugar nenhum, só usada aqui para cifrar/decifrar. Deixe os três campos abaixo em branco se só quiser atualizar endereço/usuário sem trocar as credenciais já salvas.</p>
-            <label className="settings-field"><span>Senha de app (App Password) do Nextcloud</span><input className="settings-text-input" type="password" value={appPassword} onChange={(event) => setAppPassword(event.target.value)} placeholder="Gerada em Configurações → Segurança no Nextcloud" /></label>
+            <p className="settings-note">{(usingNextcloud ? credentialsConfigured : true) ? "Frase de criptografia já configurada nesta máquina." : "Ainda não configuradas nesta máquina."} A frase de criptografia é diferente de qualquer senha — ela nunca é enviada a lugar nenhum, só usada aqui para cifrar/decifrar. Deixe os campos em branco se só quiser atualizar a configuração sem trocar as credenciais já salvas.</p>
+            {usingNextcloud ? <label className="settings-field"><span>Senha de app (App Password) do Nextcloud</span><input className="settings-text-input" type="password" value={appPassword} onChange={(event) => setAppPassword(event.target.value)} placeholder="Gerada em Configurações → Segurança no Nextcloud" /></label> : null}
             <label className="settings-field"><span>Frase de criptografia</span><input className="settings-text-input" type="password" value={passphrase} onChange={(event) => setPassphrase(event.target.value)} placeholder="Mínimo 8 caracteres" /></label>
             <label className="settings-field"><span>Confirmar frase de criptografia</span><input className="settings-text-input" type="password" value={passphraseConfirm} onChange={(event) => setPassphraseConfirm(event.target.value)} /></label>
             <div className="settings-card">
-              <div><strong>{credentialStatus || "Um único clique salva endereço, usuário, toggle e credenciais — nunca só parte da configuração."}</strong></div>
+              <div><strong>{credentialStatus || "Um único clique salva provedor, Client ID, toggle e credenciais — nunca só parte da configuração."}</strong></div>
               <div className="settings-card-actions">
-                {credentialsConfigured ? <button className="secondary-button" onClick={removeCredentials}>Remover credenciais</button> : null}
-                <button className="primary-button" onClick={saveNextcloudSection}>Salvar configuração do Nextcloud</button>
+                {usingNextcloud && credentialsConfigured ? <button className="secondary-button" onClick={removeCredentials}>Remover credenciais</button> : null}
+                <button className="primary-button" onClick={() => void saveCloudSection()}>Salvar configuração da nuvem</button>
               </div>
             </div>
             <div className="settings-card">
-              <div><strong>{connectionStatus || "Testa se o app consegue falar com o seu Nextcloud (use depois de salvar)."}</strong></div>
-              <button className="secondary-button" onClick={testConnection}>Testar conexão</button>
+              <div><strong>{connectionStatus || "Testa se o app consegue falar com a nuvem configurada (use depois de salvar)."}</strong></div>
+              <button className="secondary-button" onClick={() => void testConnection()}>Testar conexão</button>
             </div>
           </> : null}
           {section === "general" ? <>

@@ -1,24 +1,31 @@
-# HostDrive
+# Eureka42 — Universal CLI
 
-**Site oficial:** [www.hostdrive.inf.br](https://www.hostdrive.inf.br)
+**Site oficial:** [eureka42.org](https://eureka42.org)
 
-Aplicativo desktop local-first para organizar **Codex CLI, Claude Code, OpenCode e Kimi Code CLI** em projetos, terminais PTY reais e um histórico compartilhado independente dos fornecedores.
+Aplicativo desktop local-first para organizar **qualquer CLI de IA** (Codex, Claude Code, OpenCode, Kimi, Gemini, Aider, Cursor, Amp, Goose, Qwen — ou qualquer executável que você registrar) em projetos, terminais PTY reais e um histórico compartilhado independente dos fornecedores.
 
 ## Versão 0.1.0
 
-- Detecção local das quatro CLIs e versões instaladas.
-- Até seis terminais independentes por projeto.
+- **Agentes dinâmicos**: catálogo ampliado de CLIs + agentes personalizados (qualquer executável do PATH). Um agente só aparece na UI depois que você conecta — os não conectados ficam invisíveis. Adicione pelo "＋" ao lado das abas ou pelo `///agente <id>`.
+- Até seis terminais independentes por projeto, com xterm.js e PTY real (ConPTY no Windows).
+- **Contexto universal entre conversas**: o Eureka42 mantém `.eureka42/contexto.md` no projeto (memória + tarefas em aberto + conversas recentes) e injeta esse contexto nas novas sessões do Claude Code (flag validada `--append-system-prompt`). Nos demais agentes, o contexto está no arquivo para apontar ou colar. Desligável em Configurações → Privacidade.
 - Projetos recentes, busca, favoritos e arquivamento lógico.
 - Histórico SQLite com FTS5, filtros, detalhes e exportação Markdown/JSON/TXT.
-- Memória estruturada e tarefas por projeto com proveniência.
+- Memória estruturada e tarefas por projeto com proveniência; painel "Contexto" mostra o agregado e permite copiar.
 - Estado Git somente leitura, sem commits, stash ou reset automáticos.
 - Pacotes UAHP 1.0 para continuidade explícita entre agentes.
 - Configurações locais de privacidade, captura e tema (sistema/claro/escuro).
-- Retomada de sessão nativa quando o agente expõe o comando (`codex resume --last`, `--continue` em Claude/OpenCode/Kimi).
+- Retomada de sessão nativa quando o agente expõe o comando (`codex resume --last`, `--continue` em Claude/OpenCode/Kimi) — sempre validada no binário instalado, nunca presumida.
 - Comando do orquestrador `///agente <id>` / `///retomar` / `///ajuda` com paleta de sugestões, sem nunca interferir no stream do terminal.
 - Atalhos: `Cmd/Ctrl+K` (comando do orquestrador), `Cmd/Ctrl+N` (novo terminal), `Cmd/Ctrl+,` (Configurações), `Esc` (fechar diálogo).
-- Sincronização opcional via **Nextcloud** (WebDAV): memória, tarefas, pacotes UAHP e preferências, cifrados no cliente antes de saírem da máquina; histórico de terminal é opt-in por projeto (pode conter segredos). Ver `docs/decisions/005-nextcloud-sync.md`.
-- Funcionamento sem conta própria; a sincronização usa a conta Nextcloud que o usuário já tem, nunca um backend do HostDrive.
+- **Sincronização via sua própria nuvem** — Google Drive, OneDrive ou Nextcloud (um provedor ativo por vez, escolhido em Configurações → Nuvem):
+  - A conta que você já tem é a identidade: mesmo e-mail em outra máquina = mesmo trabalho. Sem conta Eureka42, sem servidor nosso.
+  - OAuth com PKCE para Google/OneDrive (Client ID gerado por você, guia embutido nas Configurações); tokens só no chaveiro do sistema.
+  - Tudo cifrado no cliente antes de sair da máquina (AES-256-GCM + Argon2) — nem o provedor vê o conteúdo.
+  - Sincroniza memória, tarefas, contexto, pacotes UAHP, preferências e agentes personalizados.
+  - **Arquivos do projeto** espelhados com opt-in por projeto (exceto `.git`, dependências, arquivos de segredo e > 4 MiB); `.eureka42/contexto.md` viaja junto. Nunca apaga arquivos; conflitos sempre perguntam.
+  - Histórico de terminal é opt-in por projeto (pode conter segredos). Ver `docs/decisions/005-nextcloud-sync.md` e `docs/decisions/007-multi-cloud-sync.md`.
+- Funcionamento sem conta própria; tudo funciona offline — a nuvem é espelho opcional.
 
 ## Privacidade
 
@@ -56,7 +63,7 @@ Neste ambiente de desenvolvimento específico, a geração do **DMG** falha porq
 
 ```bash
 cd src-tauri/target/release/bundle/macos
-ditto -c -k --sequesterRsrc --keepParent "HostDrive.app" "HostDrive_0.1.0_macOS-arm64.zip"
+ditto -c -k --sequesterRsrc --keepParent "Eureka42.app" "Eureka42_0.1.0_macOS-arm64.zip"
 ```
 
 Em uma máquina com sessão de usuário normal (não este sandbox), `--bundles app,dmg` deve gerar o DMG sem esse problema.
@@ -71,7 +78,7 @@ npm run tauri -- build --runner cargo-xwin --target x86_64-pc-windows-msvc --bun
 
 Requer `rustup target add x86_64-pc-windows-msvc`, `brew install llvm lld makensis` e `cargo install xwin cargo-xwin` previamente.
 
-O instalador (`HostDrive_0.1.0_x64-setup.exe`) foi configurado para ser amigável a quem vai testar (`src-tauri/tauri.conf.json`):
+O instalador (`Eureka42_0.1.0_x64-setup.exe`) foi configurado para ser amigável a quem vai testar (`src-tauri/tauri.conf.json`):
 - Seletor de idioma na abertura (Português do Brasil / Inglês).
 - Escolha entre instalar só para o usuário atual ou para todos (não força administrador a menos que a pessoa escolha "todos os usuários").
 - Bootstrapper do WebView2 embutido no instalador — na maioria das máquinas Windows 10/11 atuais o WebView2 já vem pré-instalado, então esse passo não faz nada perceptível; se faltar, o instalador busca e instala automaticamente (precisa de internet nesse caso).

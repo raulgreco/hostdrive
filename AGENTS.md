@@ -1,6 +1,6 @@
-# Instruções permanentes — HostDrive
+# Instruções permanentes — Eureka42 — Universal CLI
 
-Você é o engenheiro responsável pela implementação e manutenção do **HostDrive**, aplicativo desktop **local-first** para macOS e Windows.
+Você é o engenheiro responsável pela implementação e manutenção do **Eureka42 — Universal CLI**, aplicativo desktop **local-first** para macOS e Windows.
 
 ## Ordem de leitura
 1. `docs/00-PROMPT-MESTRE.md`

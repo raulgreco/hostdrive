@@ -10,6 +10,9 @@ export type Project = {
   lastSyncedAt: number;
   /** Opt-in por projeto — nunca ligado por padrão (pode conter segredos colados no terminal). */
   syncTerminalHistory: boolean;
+  /** Opt-in por projeto — sincroniza os arquivos do projeto com a nuvem. */
+  filesSyncEnabled: boolean;
+  filesLastSyncAt: number;
 };
 
 export async function listProjects() {
@@ -40,4 +43,9 @@ export async function setProjectArchived(projectId: string, archived: boolean) {
 export async function setProjectTerminalSync(projectId: string, enabled: boolean) {
   const { invoke } = await import("@tauri-apps/api/core");
   return invoke<void>("set_project_terminal_sync", { projectId, enabled });
+}
+
+export async function setProjectFilesSync(projectId: string, enabled: boolean) {
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<void>("set_project_files_sync", { projectId, enabled });
 }

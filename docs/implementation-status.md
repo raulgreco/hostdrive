@@ -1,6 +1,14 @@
 # Estado da implementação
 
-Atualizado em 2026-10-18. Primeira versão macOS: **CONCLUÍDA**. Build Windows x64 (cross-compilada deste Mac): **.exe/.dll/instalador NSIS gerados e verificados como PE válidos; execução real em Windows `NOT_VERIFIED`** (sem host/VM Windows disponível). REQ-007, REQ-010 e NFR-006 — lacunas encontradas numa auditoria dos documentos contra o código em 2026-10-13 — foram implementadas (`docs/decisions/003-resume-palette-theme.md`).
+Atualizado em 2026-11-10. **Rodada de evolução criativa concluída (exceto verificações marcadas `NOT_VERIFIED`):** rebrand para **Eureka42 — Universal CLI** (identidade oficial em `~/Desktop/EUREKA42/Identidade Visual/brandbook/`), **agentes dinâmicos** (suporte a qualquer CLI), **contexto universal entre conversas**, **sync multi-provedor** (Google Drive/OneDrive/Nextcloud) com **arquivos de projeto**, e **redesign UI "Baralho de Chips"** com splash e tela Sobre. Ver `docs/decisions/007-multi-cloud-sync.md`.
+
+**2026-11-10 — agentes dinâmicos**: catálogo ampliado (codex, claude, opencode, kimi, gemini, aider, cursor-agent, amp, goose, qwen) + agentes personalizados (`custom_agents`, qualquer executável do PATH; ids slug sem colisão). A UI só lista agentes **conectados** ao projeto (`list_project_agents` — agregação de sessões); os não conectados não aparecem, como pedido. `detect_agents` agora só retorna instalados. Retomada nativa segue restrita às 4 CLIs validadas.
+
+**2026-11-10 — contexto universal** (`src-tauri/src/context.rs`): `.eureka42/contexto.md` agregado (memória + tarefas em aberto + metadata das 10 conversas recentes — nunca bytes do terminal) publicado no projeto ao iniciar/encerrar sessão e ao mudar memória/tarefas; injetado em novas sessões do Claude Code via `--append-system-prompt` (validado via `--help` em 2026-11-10; codex/opencode/kimi não têm flag equivalente para TUI — não alegado). Preferência `context_carryover_enabled` (ligado por padrão). Painel Memória ganhou visão "Contexto" (copiar/atualizar).
+
+**2026-11-10 — sync multi-provedor** (`oauth.rs` + refactor de `sync.rs`): provedor único por vez (`cloud_provider`: nextcloud/google/onedrive); OAuth PKCE com redirect loopback e Client ID do usuário; tokens no keyring com renovação automática; escopos mínimos (drive.appdata / Files.ReadWrite.AppFolder); pacote de nível de app (preferências + agentes personalizados); **sync de arquivos do projeto** opt-in (manifesto local+remoto, nunca apaga, conflitos perguntam, exclusões de build/segredos, teto 4 MiB). Pasta na nuvem renomeada para `Eureka42`.
+
+**2026-11-10 — redesign "Baralho de Chips"**: direção escolhida pelo usuário na rodada Impeccable (seed `fa31b05b207211b6`, contrato em `.impeccable/surfaces/src-app-tsx.md`). Fichas de cor por ferramenta (Terminal teal-luz, Histórico violeta, Memória âmbar, Git teal-42, Tarefas âmbar-fundo) na identidade Eureka42; fontes Inter/Montserrat/JetBrains Mono empacotadas localmente; splash oficial; onboarding de primeiro uso; tela Sobre com o manifesto. Tema escuro por padrão (marca), claro disponível.
 
 **2026-10-18 — correções reportadas pelo usuário ao testar no Windows real** (`docs/decisions/004-windows-executable-detection-fix.md`): a detecção/lançamento de agentes (`agents::find_executable`) procurava só o nome puro do executável (`codex`, `claude`...), que nunca bate com os shims reais do Windows (`codex.exe`, `claude.cmd`, ...) — isso impedia o app de achar e iniciar qualquer CLI no Windows, o que por sua vez impedia qualquer login. Corrigido com resolução de `PATHEXT` e diretórios de instalação equivalentes do Windows. Também removidos os três botões vermelho/amarelo/verde de estilo macOS do cabeçalho — eram puramente decorativos, duplicavam os controles nativos da janela (já fornecidos pelo SO) e não faziam sentido fora do macOS.
 
@@ -61,3 +69,12 @@ Atualizado em 2026-10-18. Primeira versão macOS: **CONCLUÍDA**. Build Windows 
 ## Resultado
 
 A primeira versão funcional para macOS está concluída, incluindo os três requisitos (REQ-007, REQ-010, NFR-006) encontrados pendentes numa auditoria desta mesma data. A build Windows é gerada e cross-verificada como binário válido a partir deste Mac, com instalador NSIS amigável (idioma, modo de instalação, WebView2 embutido), mas sua execução funcional depende de um host Windows real para ser `IMPLEMENTED` — isso é reportado como `NOT_VERIFIED`, não alegado como testado. REQ-019 a REQ-024 são evolução explicitamente fora de escopo pelo próprio plano do projeto e não foram implementados. Itens `PARTIAL` indicam limitações de ambiente ou automação deliberadamente não alegada, não pendências do pacote macOS local-first.
+
+## Próximos passos (2026-11-11)
+
+1. **Testar o fluxo de nuvem com contas reais** (Google Drive / OneDrive / Nextcloud): criar os Client IDs OAuth (guia embutido em Configurações → Nuvem) e exercitar login, sync de dados e sync de arquivos. Ainda `NOT_VERIFIED`.
+2. **Decisão pendente do usuário**: registrar Client IDs próprios do projeto (Google Cloud + Microsoft Entra) para usuários finais conectarem sem ver código — ou manter o modelo "cada um com seu ID".
+3. **Teste real no Windows** (execução do instalador NSIS, ConPTY, detecção de agentes) — CI builda, execução humana pendente.
+4. **Site**: apontar para eureka42.org (feito nos arquivos; o domínio precisa existir/apontar).
+5. **Repositório**: decidir renomear `github.com/raulgreco/hostdrive` para a marca (afeta o endpoint do auto-update; o updater publica em rascunho, então a troca é segura antes da primeira release pública).
+6. Publicar release v0.2.0 (tag) quando os itens 1–3 tiverem evidência — o CI gera macOS + Windows automaticamente.

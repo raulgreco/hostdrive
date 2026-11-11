@@ -1,10 +1,21 @@
 import { useEffect, useState } from "react";
 import type { Agent } from "../data/workspace";
+import type { ConnectedAgent } from "../services/agents";
 import { TerminalPane } from "./TerminalPane";
 
 type TerminalTab = { id: number; label: string };
 
-export function TerminalWorkspace({ agents, workingDirectory, active }: { agents: Agent[]; workingDirectory: string | null; active: boolean }) {
+type Props = {
+  /** Agentes instalados descobertos (catálogo + personalizados) — alimentam a paleta e o fluxo de adicionar. */
+  agents: Agent[];
+  /** Agentes conectados ao projeto — viram as abas de agente. */
+  connectedAgents: ConnectedAgent[];
+  workingDirectory: string | null;
+  active: boolean;
+  onAgentStarted(): void;
+};
+
+export function TerminalWorkspace({ agents, connectedAgents, workingDirectory, active, onAgentStarted }: Props) {
   const [tabs, setTabs] = useState<TerminalTab[]>([{ id: 1, label: "Terminal 1" }]);
   const [selected, setSelected] = useState(1);
   function addTab() { setTabs((current) => { if (current.length >= 6) return current; const id = Math.max(...current.map((tab) => tab.id), 0) + 1; setSelected(id); return [...current, { id, label: `Terminal ${id}` }]; }); }
@@ -18,5 +29,5 @@ export function TerminalWorkspace({ agents, workingDirectory, active }: { agents
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [active]);
-  return <section className={active ? "terminal-stack" : "terminal-stack terminal-stack--inactive"} aria-hidden={!active}><nav className="terminal-tabs" aria-label="Terminais">{tabs.map((tab) => <div className={tab.id === selected ? "terminal-tab terminal-tab--active" : "terminal-tab"} key={tab.id}><button onClick={() => setSelected(tab.id)}>{tab.label}</button>{tabs.length > 1 ? <button aria-label={`Fechar ${tab.label}`} onClick={() => closeTab(tab.id)}>×</button> : null}</div>)}<button className="terminal-tab-add" onClick={addTab} disabled={tabs.length >= 6} aria-label="Novo terminal">＋</button></nav><div className="terminal-tab-content">{tabs.map((tab) => <TerminalPane key={tab.id} agents={agents} workingDirectory={workingDirectory} active={tab.id === selected} />)}</div></section>;
+  return <section className={active ? "terminal-stack" : "terminal-stack terminal-stack--inactive"} aria-hidden={!active}><nav className="terminal-tabs" aria-label="Terminais">{tabs.map((tab) => <div className={tab.id === selected ? "terminal-tab terminal-tab--active" : "terminal-tab"} key={tab.id}><button onClick={() => setSelected(tab.id)}>{tab.label}</button>{tabs.length > 1 ? <button aria-label={`Fechar ${tab.label}`} onClick={() => closeTab(tab.id)}>×</button> : null}</div>)}<button className="terminal-tab-add" onClick={addTab} disabled={tabs.length >= 6} aria-label="Novo terminal">＋</button></nav><div className="terminal-tab-content">{tabs.map((tab) => <TerminalPane key={tab.id} agents={agents} connectedAgents={connectedAgents} workingDirectory={workingDirectory} active={tab.id === selected} onAgentStarted={onAgentStarted} />)}</div></section>;
 }
