@@ -20,18 +20,18 @@ colors:
 typography:
   display:
     fontFamily: "Inter, system-ui, sans-serif"
-    fontSize: "17px"
+    fontSize: "18px"
     fontWeight: 600
     lineHeight: 1.2
     letterSpacing: "-0.025em"
   body:
     fontFamily: "Inter, system-ui, sans-serif"
-    fontSize: "13px"
+    fontSize: "14px"
     fontWeight: 400
     lineHeight: 1.5
   label:
     fontFamily: "JetBrains Mono, ui-monospace, monospace"
-    fontSize: "9px"
+    fontSize: "10px"
     fontWeight: 500
     letterSpacing: "0.12em"
   numerals:
@@ -105,10 +105,10 @@ Paleta de marca sobre noite: teal na intenção, âmbar no momento eureka, viole
 **Character:** uma voz grotesk neutra e de trabalho (Inter) com uma voz de máquina precisa (JetBrains Mono) para tudo que é medida/código. Serifa não existe no sistema — o manifesto do Sobre é Inter, não documento literário.
 
 ### Hierarchy
-- **Display** (600, 17px, −0.02em): nome do projeto no cabeçalho; título do onboarding (24px) e do Sobre (26px com o 42 em Montserrat 800).
-- **Title** (600, 18px): títulos dos painéis (Histórico, Memória…).
-- **Body** (400, 13px/1.5): texto de UI; manifesto do Sobre em 13px/1.7, medida máxima 62ch.
-- **Label** (JetBrains Mono 500, 9px, +0.12em, caixa alta): legendas de ficha, seções da sidebar, captions técnicas.
+- **Display** (600, 18px, −0.02em): nome do projeto no cabeçalho; título do onboarding (24px) e do Sobre (26px com o 42 em Montserrat 800).
+- **Title** (600, 19px): títulos dos painéis (Histórico, Memória…).
+- **Body** (400, 14px/1.5): texto de UI; manifesto do Sobre em 14px/1.7, medida máxima 62ch.
+- **Label** (JetBrains Mono 500, 10px, +0.12em, caixa alta): legendas de ficha, seções da sidebar, captions técnicas.
 
 **The One Mono Rule.** Mono é para código, dados e medida — nunca para "fazer gracinha técnica" em título ou botão.
 

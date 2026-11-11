@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Sidebar } from "./components/Sidebar";
+import { Sidebar, type ProjectHistoryStats } from "./components/Sidebar";
+import { WindowControls } from "./components/WindowControls";
 import { StatusDot } from "./components/StatusDot";
 import { TerminalWorkspace } from "./components/TerminalWorkspace";
 import { HistoryPane } from "./components/HistoryPane";
@@ -37,8 +38,6 @@ function useAppliedTheme(preference: ThemePreference): "light" | "dark" {
   return resolved;
 }
 
-const SYNC_TIMEOUT_MS = 8000;
-
 /** Baralho de Chips: as ferramentas do projeto são fichas de cor indexadas
     na identidade Eureka42. A ficha ativa sai do baralho e sua cor carimba
     o filete da área de trabalho. */
@@ -72,9 +71,7 @@ export function App() {
 
   const previousProjectRef = useRef<string | null>(null);
   const selectedProjectIdRef = useRef<string | null>(null);
-  const cloudSyncEnabledRef = useRef(false);
   selectedProjectIdRef.current = selectedProjectId;
-  cloudSyncEnabledRef.current = cloudSyncEnabled;
 
   const applyCloudSettings = useCallback((settings: AppSettings) => {
     setTheme(settings.theme);
@@ -113,6 +110,24 @@ export function App() {
       .then(setConnectedAgents)
       .catch(() => undefined);
   }, []);
+
+  // Histórico por projeto na sidebar: total de sessões e última atividade
+  // de cada projeto (agregado dos agentes conectados dele). Recarrega
+  // quando a lista de projetos muda e quando sessões são iniciadas.
+  const [projectStats, setProjectStats] = useState<Record<string, ProjectHistoryStats>>({});
+  useEffect(() => {
+    if (!isTauriRuntime() || projects.length === 0) { setProjectStats({}); return; }
+    let active = true;
+    Promise.all(projects.map((project) =>
+      listProjectAgents(project.id)
+        .then((rows): [string, ProjectHistoryStats] => {
+          const last = rows.reduce((latest, row) => (row.lastUsedAt > latest.lastUsedAt ? row : latest), rows[0] ?? { lastUsedAt: 0, label: "" });
+          return [project.id, { sessions: rows.reduce((total, row) => total + row.sessionCount, 0), lastLabel: last.label ?? "", lastUsedAt: last.lastUsedAt }];
+        })
+        .catch((): [string, ProjectHistoryStats] => [project.id, { sessions: 0, lastLabel: "", lastUsedAt: 0 }])
+    )).then((entries) => { if (active) setProjectStats(Object.fromEntries(entries)); });
+    return () => { active = false; };
+  }, [projects, connectedAgents]);
 
   useEffect(() => {
     function refreshDetectedAgents() {
@@ -174,29 +189,10 @@ export function App() {
     return () => { active = false; };
   }, [selectedProjectId, cloudSyncEnabled]);
 
-  // Ao fechar a janela, dá tempo (limitado) para enviar o projeto aberto à
-  // nuvem antes de realmente encerrar.
-  useEffect(() => {
-    if (!isTauriRuntime()) return;
-    let unlisten: (() => void) | undefined;
-    let disposed = false;
-    import("@tauri-apps/api/window").then(({ getCurrentWindow }) => {
-      if (disposed) return;
-      const win = getCurrentWindow();
-      win.onCloseRequested(async (event) => {
-        event.preventDefault();
-        const projectId = selectedProjectIdRef.current;
-        if (projectId && cloudSyncEnabledRef.current) {
-          await Promise.race([
-            syncProjectNow(projectId).catch(() => undefined),
-            new Promise((resolve) => setTimeout(resolve, SYNC_TIMEOUT_MS))
-          ]);
-        }
-        await win.destroy();
-      }).then((fn) => { if (disposed) fn(); else unlisten = fn; });
-    });
-    return () => { disposed = true; unlisten?.(); };
-  }, []);
+  // Fechamento nativo, sem interceptação: interceptar o close-requested
+  // exigia preventDefault + destroy() via IPC (latência perceptível e,
+  // na prática, o botão parecia morto). A sincronização continua automática
+  // ao trocar de projeto — nenhum dado fica preso no fechamento.
 
   async function resolveSyncConflict(prefer: "local" | "remote") {
     if (!syncConflict) return;
@@ -244,15 +240,21 @@ export function App() {
   return <div className="app-shell">
     <SplashScreen />
     <header className="titlebar" data-tauri-drag-region>
+      <WindowControls />
       <img src={resolvedTheme === "light" ? logoClaro : logoEscuro} alt="Eureka42" className="titlebar-logo" />
       <div className="titlebar-status">
         <span className="titlebar-cloud"><StatusDot />{cloudLabel}</span>
         <span className="titlebar-agents">{connectedAgents.length > 0 ? `${connectedAgents.length} ${connectedAgents.length === 1 ? "agente conectado" : "agentes conectados"}` : `${agents.filter((agent) => agent.available).length} agentes instalados`}</span>
         <button className="titlebar-button" onClick={() => setAboutOpen(true)}>Sobre</button>
-        <button className="icon-button" aria-label="Configurações" onClick={() => setSettingsOpen(true)}>⚙</button>
+        <button className="icon-button" aria-label="Configurações" title="Configurações (⌘,)" onClick={() => setSettingsOpen(true)}>
+          <svg width="17" height="17" viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M6.5 1.5h3l.5 1.7a5 5 0 0 1 1.5.9l1.7-.6 1.5 2.6-1.3 1.2a5 5 0 0 1 0 1.4l1.3 1.2-1.5 2.6-1.7-.6a5 5 0 0 1-1.5.9l-.5 1.7h-3l-.5-1.7a5 5 0 0 1-1.5-.9l-1.7.6-1.5-2.6L2.6 9.5a5 5 0 0 1 0-1.4L1.3 6.9l1.5-2.6 1.7.6a5 5 0 0 1 1.5-.9z" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+            <circle cx="8" cy="8" r="2.1" fill="none" stroke="currentColor" strokeWidth="1.2" />
+          </svg>
+        </button>
       </div>
     </header>
-    <Sidebar agents={connectedAgents} hasProject={selectedProject !== null} projects={projects} selectedProjectId={selectedProjectId} onProjectSelect={(project) => setSelectedProjectId(project.id)} onAddProject={addProject} onFavorite={toggleFavorite} onArchive={archiveProject} />
+    <Sidebar agents={connectedAgents} hasProject={selectedProject !== null} projectStats={projectStats} projects={projects} selectedProjectId={selectedProjectId} onProjectSelect={(project) => setSelectedProjectId(project.id)} onAddProject={addProject} onFavorite={toggleFavorite} onArchive={archiveProject} />
     <nav className="chip-rail" aria-label="Ferramentas do projeto">
       {UTILITY_CHIPS.map((chip) => <button
         key={chip.id}

@@ -10,7 +10,7 @@ import "@xterm/xterm/css/xterm.css";
 export const AGENTS_CHANGED_EVENT = "hostdrive:agents-changed";
 
 type Props = {
-  /** Agentes instalados descobertos — paleta do orquestrador e fluxo "adicionar". */
+  /** Agentes instalados descobertos — catálogo + personalizados. */
   agents: Agent[];
   /** Agentes conectados ao projeto — as abas. */
   connectedAgents: ConnectedAgent[];
@@ -28,6 +28,7 @@ export function TerminalPane({ agents, connectedAgents, workingDirectory, active
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [status, setStatus] = useState<"idle" | "starting" | "running" | "exited" | "error">("idle");
   const [resumedSession, setResumedSession] = useState(false);
+  const [hiddenAgents, setHiddenAgents] = useState<Set<string>>(new Set());
   const hostRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
   const sessionRef = useRef<string | null>(null);
@@ -35,20 +36,22 @@ export function TerminalPane({ agents, connectedAgents, workingDirectory, active
   const addButtonRef = useRef<HTMLButtonElement>(null);
   const [pickerPos, setPickerPos] = useState<{ top: number; left: number } | null>(null);
   const native = isTauriRuntime();
-  const canSwitchAgent = status !== "running" && status !== "starting";
+  const busy = status === "running" || status === "starting";
+  const canSwitchAgent = !busy;
   const installedAgent = agents.find((agent) => agent.id === activeAgent);
+  const visibleConnected = connectedAgents.filter((agent) => !hiddenAgents.has(agent.id));
   const canResume = canSwitchAgent && Boolean(installedAgent?.supportsResume) && Boolean(workingDirectory);
 
-  // A aba ativa segue os agentes conectados: se o atual saiu da lista e
-  // não está mais instalado, cai no mais recente conectado. Agente instalado
-  // mas ainda sem sessão (ex.: personalizado recém-adicionado) permanece.
+  // A aba ativa segue os agentes conectados visíveis: se o atual saiu da
+  // lista (ou foi fechado) e não está mais instalado, cai no mais recente
+  // conectado visível.
   useEffect(() => {
-    if (!activeAgent) { setActiveAgent(connectedAgents[0]?.id ?? null); return; }
+    if (!activeAgent || hiddenAgents.has(activeAgent)) { setActiveAgent(visibleConnected[0]?.id ?? null); return; }
     const stillValid =
-      connectedAgents.some((agent) => agent.id === activeAgent) ||
-      agents.some((agent) => agent.id === activeAgent);
-    if (!stillValid) setActiveAgent(connectedAgents[0]?.id ?? null);
-  }, [connectedAgents, agents, activeAgent]);
+      visibleConnected.some((agent) => agent.id === activeAgent) ||
+      agents.some((agent) => agent.id === activeAgent && !hiddenAgents.has(agent.id));
+    if (!stillValid) setActiveAgent(visibleConnected[0]?.id ?? null);
+  }, [connectedAgents, agents, activeAgent, hiddenAgents]);
 
   useEffect(() => {
     if (!native || !hostRef.current) return;
@@ -59,7 +62,7 @@ export function TerminalPane({ agents, connectedAgents, workingDirectory, active
 
     Promise.all([import("@xterm/xterm"), import("@xterm/addon-fit")]).then(async ([{ Terminal }, { FitAddon }]) => {
       if (disposed || !hostRef.current) return;
-      const terminal = new Terminal({ cursorBlink: true, fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 13, theme: { background: "#0A0D13", foreground: "#E9EDF2", cursor: "#34D6BC", selectionBackground: "#1A2130" } });
+      const terminal = new Terminal({ cursorBlink: true, fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 14, theme: { background: "#0A0D13", foreground: "#E9EDF2", cursor: "#34D6BC", selectionBackground: "#1A2130" } });
       const fit = new FitAddon();
       terminal.loadAddon(fit);
       terminal.open(hostRef.current);
@@ -101,17 +104,25 @@ export function TerminalPane({ agents, connectedAgents, workingDirectory, active
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [pickerOpen]);
 
-  async function startSession(resume: boolean) {
+  /** Conecta o agente: inicia a sessão de imediato, retomando a última
+      sessão nativa quando a CLI validada suporta — escolher o agente já
+      é o ato de conectar (sem botão "Retomar"). */
+  async function startSession(agentId: string, resume: boolean) {
     const terminal = terminalRef.current;
-    if (!terminal || !workingDirectory || !activeAgent || status === "starting" || status === "running") return;
+    if (!terminal || !workingDirectory || !agentId || busy) return;
     setStatus("starting");
     try {
       terminal.reset();
-      terminal.writeln(resume ? "\x1b[38;2;52;214;188mEureka42 — retomando última sessão…\x1b[0m" : "\x1b[38;2;52;214;188mEureka42 — iniciando agente…\x1b[0m");
-      const started = await launchTerminal(activeAgent, workingDirectory, terminal.cols, terminal.rows, resume);
-      sessionRef.current = started.sessionId; setSessionId(started.sessionId); setStatus("running"); setResumedSession(started.resumed); terminal.focus();
+      terminal.writeln("\x1b[38;2;52;214;188mEureka42 — conectando…\x1b[0m");
+      const started = await launchTerminal(agentId, workingDirectory, terminal.cols, terminal.rows, resume);
+      sessionRef.current = started.sessionId; setSessionId(started.sessionId); setStatus("running"); setResumedSession(started.resumed);
+      terminal.writeln(`\x1b[38;2;52;214;188mEureka42 — ${started.resumed ? "sessão retomada" : "agente conectado"}.\x1b[0m`);
+      terminal.focus();
       onAgentStarted();
-    } catch (error) { setStatus("error"); terminal.writeln(`\r\n\x1b[31m${String(error)}\x1b[0m`); }
+    } catch (error) {
+      setStatus("error");
+      terminal.writeln(`\r\n\x1b[31m${String(error)}\x1b[0m`);
+    }
   }
 
   async function stopSession() {
@@ -135,13 +146,50 @@ export function TerminalPane({ agents, connectedAgents, workingDirectory, active
   }
 
   function resumeFromCommand() {
-    if (!canResume) return "Retomada indisponível para este agente ou sessão em andamento.";
-    void startSession(true);
+    if (!canResume || !activeAgent) return "Retomada indisponível para este agente ou sessão em andamento.";
+    void startSession(activeAgent, true);
   }
 
+  /** Escolha no picker conecta direto: abre a sessão na hora (retomando
+      quando a CLI suporta). */
   function connectInstalled(agentId: string) {
+    const agent = agents.find((candidate) => candidate.id === agentId);
     setActiveAgent(agentId);
+    unhideAgent(agentId);
     closePicker();
+    void startSession(agentId, agent?.supportsResume ?? false);
+  }
+
+  async function registerCustom() {
+    setAddError(null);
+    try {
+      const created = await addCustomAgent(customLabel, customExecutable);
+      window.dispatchEvent(new CustomEvent(AGENTS_CHANGED_EVENT));
+      setPickerOpen(false);
+      setCustomLabel("");
+      setCustomExecutable("");
+      setActiveAgent(created.id);
+      unhideAgent(created.id);
+      void startSession(created.id, false);
+    } catch (error) {
+      setAddError(String(error));
+    }
+  }
+
+  function unhideAgent(agentId: string) {
+    setHiddenAgents((current) => {
+      if (!current.has(agentId)) return current;
+      const next = new Set(current);
+      next.delete(agentId);
+      return next;
+    });
+  }
+
+  /** Fecha a aba do agente: encerra a sessão em andamento (quando é a
+      aba ativa) e some com a aba — sem apagar histórico algum. */
+  async function closeAgentTab(agentId: string) {
+    if (agentId === activeAgent && status === "running") await stopSession();
+    setHiddenAgents((current) => new Set(current).add(agentId));
   }
 
   function openPicker() {
@@ -161,57 +209,55 @@ export function TerminalPane({ agents, connectedAgents, workingDirectory, active
     setPickerPos(null);
   }
 
-  async function registerCustom() {
-    setAddError(null);
-    try {
-      const created = await addCustomAgent(customLabel, customExecutable);
-      window.dispatchEvent(new CustomEvent(AGENTS_CHANGED_EVENT));
-      setPickerOpen(false);
-      setCustomLabel("");
-      setCustomExecutable("");
-      setActiveAgent(created.id);
-    } catch (error) {
-      setAddError(String(error));
-    }
-  }
-
   const unconnectedInstalled = agents.filter((agent) => !connectedAgents.some((connected) => connected.id === agent.id));
 
   return <main className={active ? "workspace" : "workspace workspace--inactive"} aria-hidden={!active}>
     <div className="agent-tabs" role="tablist" aria-label="Agentes conectados">
-      {connectedAgents.map((agent) => {
+      {visibleConnected.map((agent) => {
         const installed = agents.find((candidate) => candidate.id === agent.id);
         const unavailableHere = !installed;
-        return <button
-          role="tab"
-          aria-selected={agent.id === activeAgent}
-          disabled={unavailableHere || !canSwitchAgent}
-          className={agent.id === activeAgent ? "agent-tab agent-tab--active" : "agent-tab"}
-          key={agent.id}
-          title={unavailableHere ? `${agent.executable} não está instalado nesta máquina` : agent.executable}
-          onClick={() => setActiveAgent(agent.id)}
-        >{agent.label}{agent.running ? <span className="agent-tab-dot" aria-label="sessão em andamento" /> : null}{unavailableHere ? <small>ausente</small> : null}</button>;
+        return <div className="agent-tab-wrap" key={agent.id}>
+          <button
+            role="tab"
+            aria-selected={agent.id === activeAgent}
+            disabled={unavailableHere || !canSwitchAgent}
+            className={agent.id === activeAgent ? "agent-tab agent-tab--active" : "agent-tab"}
+            title={unavailableHere ? `${agent.executable} não está instalado nesta máquina` : agent.executable}
+            onClick={() => setActiveAgent(agent.id)}
+          >{agent.label}{agent.running ? <span className="agent-tab-dot" aria-label="sessão em andamento" /> : null}{unavailableHere ? <small>ausente</small> : null}</button>
+          <button
+            className="agent-tab-close"
+            aria-label={`Fechar aba de ${agent.label}`}
+            title={agent.id === activeAgent && status === "running" ? `Encerrar sessão de ${agent.label} e fechar a aba` : `Fechar aba de ${agent.label}`}
+            disabled={agent.id === activeAgent && status === "starting"}
+            onClick={() => void closeAgentTab(agent.id)}
+          ><svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg></button>
+        </div>;
       })}
       {native ? <div className="agent-add">
-        <button ref={addButtonRef} className="agent-tab agent-tab--add" onClick={() => (pickerOpen ? closePicker() : openPicker())} aria-expanded={pickerOpen} aria-label="Conectar outro agente">＋</button>
+        <button ref={addButtonRef} className="agent-add-button" onClick={() => (pickerOpen ? closePicker() : openPicker())} aria-expanded={pickerOpen} disabled={status === "starting"} title={busy ? "Encerre a sessão atual antes de conectar outro agente" : "Escolha um agente para conectar"}>
+          <svg width="11" height="11" viewBox="0 0 11 11" aria-hidden="true"><path d="M5.5 1v9M1 5.5h9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
+          Escolha seu agente
+        </button>
         {pickerOpen && pickerPos ? <div className="agent-picker" style={{ position: "fixed", top: pickerPos.top, left: pickerPos.left, right: "auto" }} role="dialog" aria-label="Conectar agente">
-          {unconnectedInstalled.length > 0 ? <><p className="agent-picker-heading">Instalados nesta máquina</p>{unconnectedInstalled.map((agent) => <button className="agent-picker-row" key={agent.id} onClick={() => connectInstalled(agent.id)}>
+          {unconnectedInstalled.length > 0 ? <><p className="agent-picker-heading">Instalados nesta máquina — clique para conectar</p>{unconnectedInstalled.map((agent) => <button className="agent-picker-row" key={agent.id} onClick={() => connectInstalled(agent.id)}>
             <span><strong>{agent.label}</strong><small>{agent.version ?? "versão desconhecida"}</small></span><span className="agent-picker-action">Conectar</span>
           </button>)}</> : null}
           <p className="agent-picker-heading">Qualquer executável</p>
           <label className="agent-picker-field"><span>Nome</span><input value={customLabel} onChange={(event) => setCustomLabel(event.target.value)} placeholder="Minha CLI" aria-label="Nome do agente" /></label>
           <label className="agent-picker-field"><span>Comando</span><input value={customExecutable} onChange={(event) => setCustomExecutable(event.target.value)} placeholder="mycli" aria-label="Comando executável do agente" onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void registerCustom(); } }} /></label>
           {addError ? <p className="agent-picker-error" role="alert">{addError}</p> : null}
-          <button className="primary-button" onClick={() => void registerCustom()} disabled={!customLabel.trim() || !customExecutable.trim()}>Adicionar agente</button>
+          <button className="primary-button" onClick={() => void registerCustom()} disabled={!customLabel.trim() || !customExecutable.trim()}>Adicionar e conectar</button>
         </div> : null}
       </div> : null}
-      {native && connectedAgents.length === 0 ? <span className="agent-tabs-empty">Nenhum agente conectado ainda — clique em ＋ para começar.</span> : null}
+      {native && visibleConnected.length === 0 ? <span className="agent-tabs-empty">Nenhum agente conectado — clique em <strong>Escolha seu agente</strong> para começar.</span> : null}
       {native ? status === "running"
         ? <button className="start-session start-session--stop" onClick={stopSession}>Encerrar sessão</button>
-        : <div className="start-session-group">
-            <button className="start-session" onClick={() => startSession(false)} disabled={!workingDirectory || !activeAgent || status === "starting"}>{status === "starting" ? "Abrindo…" : activeAgent ? "Nova sessão" : "Escolha um agente"}</button>
-            {installedAgent?.supportsResume ? <button className="start-session start-session--resume" onClick={() => startSession(true)} disabled={!workingDirectory || status === "starting"} title="Continua a última sessão nativa deste agente neste diretório">Retomar</button> : null}
-          </div>
+        : activeAgent
+          ? <div className="start-session-group">
+              <button className="start-session" onClick={() => startSession(activeAgent, false)} disabled={!workingDirectory || status === "starting"}>{status === "starting" ? "Conectando…" : "Nova sessão"}</button>
+            </div>
+          : null
         : null}
     </div>
     <section className="terminal" aria-label="Terminal">

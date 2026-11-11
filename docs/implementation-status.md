@@ -1,6 +1,52 @@
 # Estado da implementação
 
-Atualizado em 2026-11-10. **Rodada de evolução criativa concluída (exceto verificações marcadas `NOT_VERIFIED`):** rebrand para **Eureka42 — Universal CLI** (identidade oficial em `~/Desktop/EUREKA42/Identidade Visual/brandbook/`), **agentes dinâmicos** (suporte a qualquer CLI), **contexto universal entre conversas**, **sync multi-provedor** (Google Drive/OneDrive/Nextcloud) com **arquivos de projeto**, e **redesign UI "Baralho de Chips"** com splash e tela Sobre. Ver `docs/decisions/007-multi-cloud-sync.md`.
+Atualizado em 2026-11-11. **Correções e melhorias de uso real** (relatadas pelo
+usuário ao testar o app no Mac): botão Fechar nativo quebrado, fluxo de agentes
+confuso, fontes pequenas, splash mais longo, histórico por projeto na sidebar.
+
+**2026-11-11 — botão Fechar do macOS (root cause encontrado)**: o app testado
+hoje de manhã era um binário **obsoleto** de `npm run tauri -- build` (00:15),
+com o código antigo — o handler `onCloseRequested` fazia `preventDefault()` e
+chamava `win.destroy()` **sem a permissão** `core:window:allow-destroy`, o
+invoke era rejeitado e a janela nunca fechava. Correção: handler removido
+(fechamento 100% nativo, instantâneo, verificado por AXPress em binário novo:
+fecha em ~1s) e permissões de janela adicionadas (`allow-close/destroy/
+minimize/toggle-maximize/is-decorated/start-dragging`) para uso futuro.
+Aprendizado operacional: `cargo build` gera `target/release/universal-ai-cli`;
+o binário `Eureka42` só é atualizado pelo `npm run tauri -- build` — testar o
+caminho certo. Builds de cargo puro precisam da feature `custom-protocol`
+(documentada em `Cargo.toml`), senão o app abre com webview branco.
+
+**2026-11-11 — sync Nextcloud**: erro "HTTP 400" ao preparar a pasta agora ecoa
+o corpo da resposta do servidor na mensagem (diagnóstico real, não apenas o
+código). Causa raiz no servidor do usuário ainda em aberto — aguardando o
+texto exato do erro.
+
+**2026-11-11 — UX do fluxo de agentes**: o ＋ virou botão rotulado **"Escolha
+seu agente"**; escolher um agente no picker **conecta direto** (inicia a sessão
+na hora, retomando a sessão nativa quando a CLI validada suporta — botão
+"Retomar" removido da UI); cada aba de agente ganhou **× de fechar** (encerra a
+sessão ativa se for a aba corrente e esconde a aba — nunca apaga histórico);
+mensagens do terminal refletem o estado real ("conectando… / sessão retomada /
+agente conectado").
+
+**2026-11-11 — legibilidade e primeira tela**: escala tipográfica global
+aumentada (body 13→14px, labels 9→10px, ajustes em todos os painéis — DESIGN.md
+atualizado); ícone de Configurações trocado de glifo Unicode para **SVG de
+engrenagem** com área de toque 32px; splash de 4s para **7s**; sidebar mostra
+**histórico por projeto** (total de sessões + último agente/data) e botão
+rotulado "Novo projeto". Controles de janela desenhados pelo app
+(`WindowControls`) ficam dormentes — só renderizam se a janela estiver sem
+decoração nativa.
+
+**Verificações desta rodada**: 31 testes Rust + 6 Vitest + builds verdes;
+app real executado no Mac com capturas de tela: UI nova completa renderizada
+(abas com ×, "Escolha seu agente", histórico na sidebar, fontes maiores);
+**fechamento nativo verificado (≤1s)**. Conexão de agente com clique real:
+`NOT_VERIFIED` (automação não alcança botões do webview) — a ser confirmado
+pelo usuário.
+
+**Rodada anterior (2026-11-10) — resumo**: rebrand para **Eureka42 — Universal CLI** (identidade oficial em `~/Desktop/EUREKA42/Identidade Visual/brandbook/`), **agentes dinâmicos** (suporte a qualquer CLI), **contexto universal entre conversas**, **sync multi-provedor** (Google Drive/OneDrive/Nextcloud) com **arquivos de projeto**, e **redesign UI "Baralho de Chips"** com splash e tela Sobre. Ver `docs/decisions/007-multi-cloud-sync.md`.
 
 **2026-11-10 — agentes dinâmicos**: catálogo ampliado (codex, claude, opencode, kimi, gemini, aider, cursor-agent, amp, goose, qwen) + agentes personalizados (`custom_agents`, qualquer executável do PATH; ids slug sem colisão). A UI só lista agentes **conectados** ao projeto (`list_project_agents` — agregação de sessões); os não conectados não aparecem, como pedido. `detect_agents` agora só retorna instalados. Retomada nativa segue restrita às 4 CLIs validadas.
 

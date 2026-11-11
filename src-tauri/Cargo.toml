@@ -9,6 +9,12 @@ edition = "2021"
 name = "universal_ai_cli_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[features]
+# Obrigatória em builds de release fora do CLI do Tauri (cargo build puro):
+# sem ela o app não serve os assets embutidos do frontend (tela branca).
+# O `npm run tauri -- build` já liga isso sozinho.
+custom-protocol = ["tauri/custom-protocol"]
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 

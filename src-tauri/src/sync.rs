@@ -1173,10 +1173,22 @@ impl Remote {
                     .send()
                     .await
                     .map_err(|error| format!("falha ao preparar a pasta \"{REMOTE_FOLDER}\": {error}"))?;
-                match response.status().as_u16() {
+                let status = response.status().as_u16();
+                match status {
                     200..=299 | 405 => Ok(()),
                     401 | 403 => Err("Nextcloud recusou a autenticação (usuário ou senha de app incorretos).".into()),
-                    status => Err(format!("falha ao preparar a pasta \"{REMOTE_FOLDER}\" no Nextcloud: HTTP {status}")),
+                    _ => {
+                        // Ecoa o corpo da resposta (XML do SabreDAV costuma
+                        // explicar o motivo) — "HTTP 400" sozinho não é
+                        // acionável para quem está configurando o servidor.
+                        let detail = response.text().await.unwrap_or_default();
+                        let detail: String = detail.chars().filter(|character| !character.is_control()).take(160).collect();
+                        if detail.is_empty() {
+                            Err(format!("falha ao preparar a pasta \"{REMOTE_FOLDER}\" no Nextcloud: HTTP {status}"))
+                        } else {
+                            Err(format!("falha ao preparar a pasta \"{REMOTE_FOLDER}\" no Nextcloud: HTTP {status} — {detail}"))
+                        }
+                    }
                 }
             }
             // Google Drive (appDataFolder) e OneDrive (approot) já existem por

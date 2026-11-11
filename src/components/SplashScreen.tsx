@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import splash from "../assets/brand/splash-screen.png";
 
-const MIN_SPLASH_MS = 4000;
+const MIN_SPLASH_MS = 7000;
 
-/** Abertura do app: a arte oficial de splash fica ~4s centralizada em
+/** Abertura do app: a arte oficial de splash fica ~7s centralizada em
     meia escala (padrão splash de IDE) enquanto o shell carrega; some por
     fade (ou corte, com movimento reduzido). */
 export function SplashScreen() {
