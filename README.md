@@ -221,6 +221,7 @@ A especificação completa vive em `docs/` (em português):
 | [08 — Plano de Implementação](docs/08-PLANO-IMPLEMENTACAO.md) | fases e escopo |
 | [09 — Testes e Aceite](docs/09-TESTES-E-ACEITE.md) | cenários de aceite |
 | [implementation-status](docs/implementation-status.md) | estado real da implementação, com o que está `NOT_VERIFIED` |
+| [Apresentação do manifesto](docs/apresentacao/index.html) | slides interativos (13 telas) — abra no browser ou veja via GitHub Pages |
 | [decisions/](docs/decisions/) | histórico de decisões arquiteturais |
 
 ## Privacidade e segurança

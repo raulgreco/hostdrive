@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Eureka42 — O Manifesto · Universal-CLI</title>
+<style>
+  @font-face { font-family: "Inter"; font-style: normal; font-weight: 400; font-display: swap; src: url("fonts/inter-400-latin.woff2") format("woff2"); }
+  @font-face { font-family: "Inter"; font-style: normal; font-weight: 500; font-display: swap; src: url("fonts/inter-500-latin.woff2") format("woff2"); }
+  @font-face { font-family: "Inter"; font-style: normal; font-weight: 600; font-display: swap; src: url("fonts/inter-600-latin.woff2") format("woff2"); }
+  @font-face { font-family: "Inter"; font-style: normal; font-weight: 700; font-display: swap; src: url("fonts/inter-700-latin.woff2") format("woff2"); }
+  @font-face { font-family: "Montserrat"; font-style: normal; font-weight: 800; font-display: swap; src: url("fonts/montserrat-800-latin.woff2") format("woff2"); }
+  @font-face { font-family: "JetBrains Mono"; font-style: normal; font-weight: 400; font-display: swap; src: url("fonts/jetbrains-mono-400-latin.woff2") format("woff2"); }
+  @font-face { font-family: "JetBrains Mono"; font-style: normal; font-weight: 500; font-display: swap; src: url("fonts/jetbrains-mono-500-latin.woff2") format("woff2"); }
+
+  :root {
+    --noite: #0A0D13;
+    --sup-1: #121722;
+    --sup-2: #1A2130;
+    --linha: #2A3242;
+    --texto: #E9EDF2;
+    --muted: #98A2B3;
+    --teal: #0E8A77;
+    --teal-luz: #34D6BC;
+    --ambar: #F2B33D;
+    --ambar-fundo: #9A6406;
+    --violeta: #8B7CF6;
+    --coral: #FF7A6B;
+    --grade: 42px;
+    --ease: cubic-bezier(.23, 1, .32, 1);
+    font-size: clamp(14px, .55vw + 10px, 22px);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+
+  body {
+    font-family: "Inter", system-ui, sans-serif;
+    background: var(--noite);
+    color: var(--texto);
+    overflow: hidden;
+  }
+
+  /* ── Grade 42 de fundo ─────────────────────────────── */
+  .grade {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background: url("../images/motivo-grade42-escuro.svg") center / cover no-repeat;
+    opacity: .9;
+  }
+  .vinheta {
+    position: fixed; inset: 0; z-index: 1; pointer-events: none;
+    background: radial-gradient(120% 90% at 50% 40%, transparent 40%, rgb(10 13 19 / .82) 100%);
+  }
+
+  /* ── Slides ────────────────────────────────────────── */
+  .deck { position: relative; z-index: 2; height: 100%; }
+  .slide {
+    position: absolute; inset: 0;
+    display: none;
+    flex-direction: column; justify-content: center;
+    padding: calc(var(--grade) * 1.5) calc(var(--grade) * 2.2);
+    animation: entrar .55s var(--ease) both;
+  }
+  .slide.ativa { display: flex; }
+  @keyframes entrar {
+    from { opacity: 0; transform: translateY(26px); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  .kicker {
+    font-family: "JetBrains Mono", monospace;
+    font-size: .8rem; letter-spacing: .28em; text-transform: uppercase;
+    color: var(--teal-luz); margin-bottom: calc(var(--grade) * .5);
+  }
+  .display {
+    font-family: "Montserrat", sans-serif; font-weight: 800;
+    font-size: clamp(2.6rem, 6.5vw, 6rem); line-height: .98;
+    letter-spacing: -.035em;
+  }
+  .h1 { font-weight: 700; font-size: clamp(2rem, 4.2vw, 3.8rem); letter-spacing: -.025em; line-height: 1.05; }
+  .lead { font-size: clamp(1.05rem, 1.5vw, 1.45rem); line-height: 1.55; color: var(--muted); max-width: 46ch; margin-top: calc(var(--grade) * .55); }
+  .lead strong, .lead b { color: var(--texto); font-weight: 600; }
+  .acento { color: var(--teal-luz); }
+  .numero-grande {
+    font-family: "Montserrat", sans-serif; font-weight: 800;
+    font-size: clamp(6rem, 16vw, 13rem); line-height: .85;
+    letter-spacing: -.04em; opacity: .16;
+    position: absolute; right: calc(var(--grade) * 2); top: calc(var(--grade) * 1.2);
+    pointer-events: none; user-select: none;
+  }
+  .nota-rodape {
+    position: absolute; left: calc(var(--grade) * 2.2); bottom: calc(var(--grade) * .9);
+    font-family: "JetBrains Mono", monospace; font-size: .78rem; color: var(--muted);
+    display: flex; gap: 1.2em; align-items: center;
+  }
+  .nota-rodape::before { content: ""; width: var(--grade); height: 1px; background: var(--linha); }
+
+  /* ── Capa ──────────────────────────────────────────── */
+  .capa { align-items: center; text-align: center; }
+  .capa img.logo { width: clamp(280px, 34vw, 520px); margin-bottom: calc(var(--grade) * .9); }
+  .capa .display { max-width: 16ch; }
+  .capa .lead { margin-top: calc(var(--grade) * .7); }
+  .capa .links {
+    margin-top: calc(var(--grade) * 1.1);
+    font-family: "JetBrains Mono", monospace; font-size: .85rem; color: var(--muted);
+    display: flex; gap: 2.2em; flex-wrap: wrap; justify-content: center;
+  }
+  .capa .links a { color: var(--teal-luz); text-decoration: none; }
+  .capa .links a:hover { text-decoration: underline; }
+
+  /* ── O nome ────────────────────────────────────────── */
+  .nome { display: grid !important; grid-template-columns: repeat(3, 1fr); gap: calc(var(--grade) * .8); align-content: center; }
+  .nome .palavra { border-top: 2px solid var(--linha); padding-top: calc(var(--grade) * .5); }
+  .nome .palavra .simbolo {
+    font-family: "Montserrat", sans-serif; font-weight: 800;
+    font-size: clamp(3rem, 7vw, 6.4rem); letter-spacing: -.03em; line-height: 1;
+  }
+  .nome .palavra .gloss { margin-top: calc(var(--grade) * .45); color: var(--muted); font-size: 1.02rem; line-height: 1.5; }
+  .nome .palavra:nth-child(1) .simbolo { color: var(--ambar); }
+  .nome .palavra:nth-child(2) .simbolo { color: var(--teal-luz); }
+  .nome .palavra:nth-child(3) .simbolo { color: var(--violeta); }
+
+  /* ── Princípios ────────────────────────────────────── */
+  .principio .h1 { margin-top: .2em; }
+
+  /* ── Produto ───────────────────────────────────────── */
+  .duas-colunas { display: grid !important; grid-template-columns: 1.35fr 1fr; gap: calc(var(--grade) * 1.2); align-items: center; }
+  .shot {
+    border-radius: 14px; border: 1px solid var(--linha);
+    box-shadow: 0 32px 80px -24px rgb(0 0 0 / .75);
+    width: 100%; display: block;
+  }
+  .lista { list-style: none; margin-top: calc(var(--grade) * .6); }
+  .lista li {
+    padding: calc(var(--grade) * .32) 0; border-bottom: 1px solid var(--linha);
+    display: flex; gap: 1em; align-items: baseline; font-size: 1.02rem; color: var(--muted);
+  }
+  .lista li:last-child { border-bottom: 0; }
+  .lista li::before { content: "//"; font-family: "JetBrains Mono", monospace; color: var(--teal-luz); flex: none; }
+  .lista li b { color: var(--texto); font-weight: 600; }
+
+  /* ── Linguagens ────────────────────────────────────── */
+  .cartoes { display: grid !important; grid-template-columns: repeat(3, 1fr); gap: calc(var(--grade) * .8); margin-top: calc(var(--grade) * .9); }
+  .cartao {
+    background: rgb(18 23 34 / .82); border: 1px solid var(--linha); border-radius: 14px;
+    padding: calc(var(--grade) * .7); position: relative; overflow: hidden;
+  }
+  .cartao::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px; background: var(--cor, var(--teal-luz)); }
+  .cartao .pct { font-family: "Montserrat", sans-serif; font-weight: 800; font-size: 2.6rem; letter-spacing: -.03em; color: var(--cor, var(--teal-luz)); }
+  .cartao .ling { font-weight: 700; font-size: 1.25rem; margin-top: .1em; }
+  .cartao .onde { font-family: "JetBrains Mono", monospace; font-size: .78rem; color: var(--muted); margin-top: .35em; letter-spacing: .06em; }
+  .cartao p { color: var(--muted); font-size: .95rem; line-height: 1.5; margin-top: .7em; }
+  .ferramentas {
+    margin-top: calc(var(--grade) * .9);
+    font-family: "JetBrains Mono", monospace; font-size: .85rem; color: var(--muted);
+    letter-spacing: .04em;
+  }
+
+  /* ── Nuvem / fluxo ─────────────────────────────────── */
+  .fluxo { display: flex; align-items: center; gap: 1em; margin-top: calc(var(--grade) * .9); flex-wrap: wrap; }
+  .no {
+    background: var(--sup-1); border: 1px solid var(--linha); border-radius: 12px;
+    padding: calc(var(--grade) * .4) calc(var(--grade) * .55);
+    font-weight: 600; font-size: .98rem;
+  }
+  .no small { display: block; font-family: "JetBrains Mono", monospace; font-weight: 400; font-size: .72rem; color: var(--muted); margin-top: .3em; }
+  .seta { color: var(--teal-luz); font-family: "JetBrains Mono", monospace; font-size: 1.3rem; }
+
+  /* ── GitHub ────────────────────────────────────────── */
+  .repo-card {
+    margin-top: calc(var(--grade) * .8); max-width: 640px;
+    background: var(--sup-1); border: 1px solid var(--linha); border-radius: 14px; padding: calc(var(--grade) * .7);
+  }
+  .repo-card .repo-nome { font-family: "JetBrains Mono", monospace; font-size: 1.05rem; color: var(--teal-luz); }
+  .repo-card .repo-desc { color: var(--muted); margin-top: .45em; line-height: 1.5; }
+  .topicos { display: flex; gap: .5em; flex-wrap: wrap; margin-top: .8em; }
+  .topico {
+    font-family: "JetBrains Mono", monospace; font-size: .72rem; color: var(--teal-luz);
+    border: 1px solid rgb(52 214 188 / .35); border-radius: 999px; padding: .25em .9em;
+  }
+  .stats { display: flex; gap: 2em; margin-top: calc(var(--grade) * .6); font-family: "JetBrains Mono", monospace; font-size: .85rem; color: var(--muted); }
+  .stats b { color: var(--ambar); font-weight: 500; }
+
+  /* ── Encerramento ──────────────────────────────────── */
+  .fim { align-items: center; text-align: center; }
+  .fim .quarenta {
+    font-family: "Montserrat", sans-serif; font-weight: 800;
+    font-size: clamp(8rem, 26vw, 20rem); line-height: .8; letter-spacing: -.05em;
+    background: linear-gradient(135deg, var(--teal-luz), var(--ambar));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .fim .frase { font-size: clamp(1.3rem, 2.6vw, 2.1rem); font-weight: 600; margin-top: .4em; }
+  .fim .links { margin-top: calc(var(--grade)); font-family: "JetBrains Mono", monospace; font-size: .85rem; color: var(--muted); display: flex; gap: 2em; }
+  .fim .links a { color: var(--teal-luz); text-decoration: none; }
+
+  /* ── UI do deck ────────────────────────────────────── */
+  #progresso {
+    position: fixed; top: 0; left: 0; height: 3px; width: 0;
+    background: linear-gradient(90deg, var(--teal-luz), var(--ambar));
+    transition: width .4s var(--ease); z-index: 10;
+  }
+  #contador {
+    position: fixed; right: 1.4rem; bottom: 1rem; z-index: 10;
+    font-family: "JetBrains Mono", monospace; font-size: .8rem; color: var(--muted);
+  }
+  .nav {
+    position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%); z-index: 10;
+    display: flex; gap: .6em;
+  }
+  .nav button {
+    font-family: "JetBrains Mono", monospace; font-size: .95rem;
+    background: var(--sup-1); color: var(--texto);
+    border: 1px solid var(--linha); border-radius: 8px;
+    width: 2.6em; height: 2.2em; cursor: pointer;
+  }
+  .nav button:hover { border-color: var(--teal-luz); color: var(--teal-luz); }
+
+  @media (max-width: 900px) {
+    .slide { padding: calc(var(--grade)) 1.4rem; }
+    .duas-colunas, .nome, .cartoes { grid-template-columns: 1fr !important; }
+    .numero-grande { display: none; }
+  }
+
+  @media print {
+    body { overflow: visible; }
+    .grade, .vinheta { position: absolute; }
+    #progresso, #contador, .nav { display: none; }
+    .slide { position: relative; display: flex !important; page-break-after: always; min-height: 100vh; animation: none; }
+  }
+</style>
+</head>
+<body>
+<div class="grade"></div>
+<div class="vinheta"></div>
+
+<main class="deck" id="deck">
+
+  <!-- 1 · Capa -->
+  <section class="slide capa ativa">
+    <img class="logo" src="../images/logo.svg" alt="Eureka42">
+    <p class="kicker">Universal-CLI · apresentação</p>
+    <h1 class="display">O Manifesto<br>Eureka42</h1>
+    <p class="lead">Um orquestrador desktop <b>local-first</b> para qualquer CLI de IA —
+      terminal real, memória universal e a <b>sua</b> nuvem.</p>
+    <div class="links">
+      <a href="https://eureka42.org">eureka42.org</a>
+      <a href="https://github.com/eureka42-ai/universal-cli">github.com/eureka42-ai/universal-cli</a>
+      <span>2026 · código aberto</span>
+    </div>
+  </section>
+
+  <!-- 2 · O nome -->
+  <section class="slide">
+    <p class="kicker">O nome</p>
+    <div class="nome">
+      <div class="palavra">
+        <div class="simbolo">Eureka</div>
+        <p class="gloss">o instante da descoberta — o momento em que a ideia deixa de ser intangível</p>
+      </div>
+      <div class="palavra">
+        <div class="simbolo">42</div>
+        <p class="gloss">a resposta — a referência de <em>O Guia do Mochileiro das Galáxias</em>, sem rodeios</p>
+      </div>
+      <div class="palavra">
+        <div class="simbolo">⌘</div>
+        <p class="gloss">o atalho — ação direta: menos cliques, mais construção</p>
+      </div>
+    </div>
+    <div class="nota-rodape">significado · marca registrada Eureka42</div>
+  </section>
+
+  <!-- 3 · Princípio 1 -->
+  <section class="slide principio">
+    <span class="numero-grande" style="color: var(--teal-luz)">01</span>
+    <p class="kicker">Princípio 1 / 6</p>
+    <h2 class="h1">Local-first <span class="acento">radical</span></h2>
+    <p class="lead">O núcleo, o banco, a memória e os pacotes ficam <strong>no seu computador</strong>.
+      Não existe servidor Eureka42, conta própria, telemetria ou sincronização obrigatória.
+      A nuvem é um espelho opcional — e é a <strong>sua</strong>.</p>
+    <div class="nota-rodape">sqlite · sem telemetria · funciona offline</div>
+  </section>
+
+  <!-- 4 · Princípio 2 -->
+  <section class="slide principio">
+    <span class="numero-grande" style="color: var(--violeta)">02</span>
+    <p class="kicker">Princípio 2 / 6</p>
+    <h2 class="h1">Qualquer agente, <span style="color:var(--violeta)">sem imitação</span></h2>
+    <p class="lead">O app não reproduz CLIs: executa os <strong>binários reais</strong> que você instalou,
+      preservando TUI, autenticação, MCP, skills e permissões. Surgiu uma CLI nova?
+      Você a registra — e ela passa a funcionar <strong>sem esperar atualização nossa</strong>.</p>
+    <div class="nota-rodape">codex · claude code · opencode · kimi · gemini · a sua também</div>
+  </section>
+
+  <!-- 5 · Princípio 3 -->
+  <section class="slide principio">
+    <span class="numero-grande" style="color: var(--ambar)">03</span>
+    <p class="kicker">Princípio 3 / 6</p>
+    <h2 class="h1">Você é o dono <span style="color:var(--ambar)">do contexto</span></h2>
+    <p class="lead">Memória universal por projeto, tarefas com proveniência e handoffs em
+      <strong>pacotes verificáveis</strong> (UAHP 1.0). Trocar de agente transmite um pacote
+      explícito e auditável — <strong>nunca o estado oculto</strong> de um modelo.</p>
+    <div class="nota-rodape">.eureka42/contexto.md · uahp 1.0</div>
+  </section>
+
+  <!-- 6 · Princípio 4 -->
+  <section class="slide principio">
+    <span class="numero-grande" style="color: var(--teal-luz)">04</span>
+    <p class="kicker">Princípio 4 / 6</p>
+    <h2 class="h1">Capacidade <span class="acento">só com evidência</span></h2>
+    <p class="lead">Cada adaptador declara o que foi <strong>validado no binário instalado</strong> —
+      retomada de sessão, flags, versões. Nada é presumido pela documentação:
+      o que não foi testado é dito, com a etiqueta <strong>NOT_VERIFIED</strong>.</p>
+    <div class="nota-rodape">retomada validada · sem promessa de marketing</div>
+  </section>
+
+  <!-- 7 · Princípio 5 -->
+  <section class="slide principio">
+    <span class="numero-grande" style="color: var(--ambar)">05</span>
+    <p class="kicker">Princípio 5 / 6</p>
+    <h2 class="h1">Sem clichê <span style="color:var(--ambar)">de IA</span></h2>
+    <p class="lead">Nada de cérebros, robôs ou degradê roxo-azul. Interface escura sobre a
+      <strong>grade 42</strong>, tipografia Inter/Montserrat/JetBrains Mono e o
+      <strong>Baralho de Chips</strong> — fichas de cor por função, como um baralho na mesa.</p>
+    <div class="nota-rodape">grade de 42px · anti-hype com demonstração</div>
+  </section>
+
+  <!-- 8 · Princípio 6 -->
+  <section class="slide principio">
+    <span class="numero-grande" style="color: var(--violeta)">06</span>
+    <p class="kicker">Princípio 6 / 6</p>
+    <h2 class="h1">Código <span style="color:var(--violeta)">aberto</span></h2>
+    <p class="lead">Projeto público, decisões documentadas em <strong>docs/decisions</strong> e
+      estado real registrado em <strong>implementation-status</strong> — implementado, testado
+      e pendente, sem maquiagem. O histórico de escolhas arquiteturais é parte do produto.</p>
+    <div class="nota-rodape">github.com/eureka42-ai/universal-cli</div>
+  </section>
+
+  <!-- 9 · O produto -->
+  <section class="slide">
+    <div class="duas-colunas">
+      <div>
+        <img class="shot" src="../images/main-window.png" alt="Janela principal do Eureka42">
+      </div>
+      <div>
+        <p class="kicker">O produto</p>
+        <h2 class="h1">Universal-CLI</h2>
+        <ul class="lista">
+          <li><span><b>Terminal PTY real</b> — até 6 abas por projeto, TUI íntegra das CLIs</span></li>
+          <li><span><b>Baralho de Chips</b> — Terminal, Histórico, Memória, Git e Tarefas</span></li>
+          <li><span><b>Histórico FTS5</b> — busca instantânea em todas as sessões</span></li>
+          <li><span><b>Git somente leitura</b> — nenhum commit ou stash automático</span></li>
+          <li><span><b>Retomada nativa</b> — quando a CLI valida, nunca presumida</span></li>
+        </ul>
+      </div>
+    </div>
+    <div class="nota-rodape">eureka42 — universal cli · macos · windows · linux</div>
+  </section>
+
+  <!-- 10 · Linguagens -->
+  <section class="slide">
+    <p class="kicker">Engenharia</p>
+    <h2 class="h1">Três linguagens,<br>cada uma no seu lugar</h2>
+    <div class="cartoes">
+      <div class="cartao" style="--cor: var(--teal-luz)">
+        <div class="pct">~60%</div>
+        <div class="ling">Rust</div>
+        <div class="onde">NÚCLEO — TAURI 2</div>
+        <p>PTY, processos, SQLite, criptografia, OAuth e sync — segurança de memória sem GC e binário nativo único.</p>
+      </div>
+      <div class="cartao" style="--cor: var(--violeta)">
+        <div class="pct">~35%</div>
+        <div class="ling">TypeScript</div>
+        <div class="onde">INTERFACE — REACT 19</div>
+        <p>Componentes, serviços de invoke tipados e o Baralho de Chips — tipagem estática de ponta a ponta.</p>
+      </div>
+      <div class="cartao" style="--cor: var(--ambar)">
+        <div class="pct">SQL</div>
+        <div class="ling">SQLite FTS5</div>
+        <div class="onde">PERSISTÊNCIA — WAL</div>
+        <p>Esquema e consultas declarativas: busca full-text indexada e transações locais auditáveis.</p>
+      </div>
+    </div>
+    <p class="ferramentas">Tauri 2 · React 19 · Vite · xterm.js · portable-pty · GitHub Actions (macOS / Windows / Linux)</p>
+  </section>
+
+  <!-- 11 · Nuvem -->
+  <section class="slide">
+    <p class="kicker">Sincronização</p>
+    <h2 class="h1">A sua nuvem,<br><span class="acento">cifrada na sua máquina</span></h2>
+    <p class="lead">Google Drive ou OneDrive com OAuth PKCE e o seu próprio Client ID.
+      Tokens só no chaveiro do SO; pacotes cifrados com <strong>AES-256-GCM + Argon2</strong>
+      antes de saírem do disco. Mesmo e-mail em outra máquina = <strong>mesmo trabalho</strong>.</p>
+    <div class="fluxo">
+      <div class="no">Universal-CLI<small>dados locais</small></div>
+      <span class="seta">→</span>
+      <div class="no">Cifra cliente<small>aes-256-gcm · argon2</small></div>
+      <span class="seta">→</span>
+      <div class="no">Drive / OneDrive<small>pasta oculta do app</small></div>
+      <span class="seta">→</span>
+      <div class="no">Outra máquina<small>mesmo e-mail</small></div>
+    </div>
+  </section>
+
+  <!-- 12 · GitHub -->
+  <section class="slide">
+    <p class="kicker">Comunidade</p>
+    <h2 class="h1">Aberto no GitHub</h2>
+    <div class="repo-card">
+      <div class="repo-nome">eureka42-ai / universal-cli</div>
+      <p class="repo-desc">Orquestrador desktop local-first para qualquer CLI de IA — terminal PTY real,
+        memória universal, histórico FTS5 e sync cifrado via Google Drive/OneDrive.</p>
+      <div class="topicos">
+        <span class="topico">tauri</span><span class="topico">rust</span><span class="topico">react</span>
+        <span class="topico">typescript</span><span class="topico">local-first</span>
+        <span class="topico">ai-agents</span><span class="topico">terminal</span>
+      </div>
+    </div>
+    <div class="stats">
+      <span><b>32</b> testes rust</span>
+      <span><b>6</b> testes vitest</span>
+      <span><b>3</b> plataformas no CI</span>
+      <span>issues e PRs <b>bem-vindos</b></span>
+    </div>
+  </section>
+
+  <!-- 13 · Encerramento -->
+  <section class="slide fim">
+    <div class="quarenta">42</div>
+    <p class="frase">Do insight ao código.</p>
+    <div class="links">
+      <a href="https://eureka42.org">eureka42.org</a>
+      <a href="https://github.com/eureka42-ai/universal-cli">github.com/eureka42-ai/universal-cli</a>
+    </div>
+  </section>
+
+</main>
+
+<div id="progresso"></div>
+<div class="nav">
+  <button type="button" id="ant" aria-label="Slide anterior">‹</button>
+  <button type="button" id="prox" aria-label="Próximo slide">›</button>
+</div>
+<div id="contador"></div>
+
+<script>
+(function () {
+  const slides = Array.from(document.querySelectorAll(".slide"));
+  const total = slides.length;
+  const progresso = document.getElementById("progresso");
+  const contador = document.getElementById("contador");
+  let atual = 0;
+
+  function doIndiceHash() {
+    const n = parseInt(location.hash.replace("#", ""), 10);
+    return Number.isFinite(n) ? Math.min(Math.max(n - 1, 0), total - 1) : 0;
+  }
+
+  function mostrar(i, empurraHash) {
+    atual = Math.min(Math.max(i, 0), total - 1);
+    slides.forEach((s, k) => s.classList.toggle("ativa", k === atual));
+    progresso.style.width = ((atual + 1) / total * 100) + "%";
+    contador.textContent = String(atual + 1).padStart(2, "0") + " / " + String(total).padStart(2, "0");
+    if (empurraHash !== false) history.replaceState(null, "", "#" + (atual + 1));
+  }
+
+  document.getElementById("prox").addEventListener("click", () => mostrar(atual + 1));
+  document.getElementById("ant").addEventListener("click", () => mostrar(atual - 1));
+  document.addEventListener("keydown", (e) => {
+    if (["ArrowRight", "ArrowDown", "PageDown", " "].includes(e.key)) { e.preventDefault(); mostrar(atual + 1); }
+    if (["ArrowLeft", "ArrowUp", "PageUp"].includes(e.key)) { e.preventDefault(); mostrar(atual - 1); }
+    if (e.key === "Home") mostrar(0);
+    if (e.key === "End") mostrar(total - 1);
+  });
+
+  let toqueX = null;
+  document.addEventListener("touchstart", (e) => { toqueX = e.touches[0].clientX; }, { passive: true });
+  document.addEventListener("touchend", (e) => {
+    if (toqueX === null) return;
+    const dx = e.changedTouches[0].clientX - toqueX;
+    if (Math.abs(dx) > 48) mostrar(atual + (dx < 0 ? 1 : -1));
+    toqueX = null;
+  }, { passive: true });
+
+  window.addEventListener("hashchange", () => mostrar(doIndiceHash(), false));
+  mostrar(doIndiceHash(), false);
+})();
+</script>
+</body>
+</html>
