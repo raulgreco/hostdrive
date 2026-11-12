@@ -39,6 +39,21 @@ rotulado "Novo projeto". Controles de janela desenhados pelo app
 (`WindowControls`) ficam dormentes — só renderizam se a janela estiver sem
 decoração nativa.
 
+**2026-11-11 — padrão macOS de fechamento + silêncio no boot + chaveiro**:
+
+- Fechar (×) agora **esconde** a janela e o app continua na Dock — padrão
+  macOS (⌘Q encerra de verdade). Clique no ícone na Dock reabre a janela
+  (`RunEvent::Reopen` no Rust). Fechamento-verificado: esconde e o processo
+  segue vivo; reabertura via Dock: `NOT_VERIFIED` (não reproduzível via
+  automação do bare binary).
+- Sync automático **silencioso na abertura** do app: falha na nuvem não gera
+  toast de erro nem de sucesso no lançamento (best-effort, console); em
+  trocas de projeto feitas pelo usuário o status volta a aparecer.
+- Chaveiro com **leituras memoizadas por processo** (`secret_cache`): antes,
+  cada ponto do código que lia o keychain disparava um prompt potencial no
+  macOS (~15 senhas relatadas); agora o máximo é um prompt por item por
+  lançamento — e zero após "Permitir Sempre".
+
 **2026-11-11 — picker de agentes + nuvem sem padrão**: o picker "Instalados nesta
 máquina" lista **todos** os instalados — os já conectados aparecem como "Abrir"
 (ausência de Claude/Codex na lista era filtro de já-conectados, não falha de

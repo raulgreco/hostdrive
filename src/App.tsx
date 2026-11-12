@@ -166,13 +166,36 @@ export function App() {
     return () => { active = false; };
   }, []);
 
+  // Padrão macOS: o botão fechar ESCONDE a janela — o app continua vivo na
+  // Dock (clique no ícone reabre, ver Reopen no Rust) e ⌘Q encerra de
+  // verdade. Fora do macOS, fechar continua encerrando a janela normalmente.
+  useEffect(() => {
+    if (!isTauriRuntime() || !navigator.userAgent.includes("Mac")) return;
+    let unlisten: (() => void) | undefined;
+    let disposed = false;
+    import("@tauri-apps/api/window").then(async ({ getCurrentWindow }) => {
+      if (disposed) return;
+      const win = getCurrentWindow();
+      unlisten = await win.onCloseRequested(async (event) => {
+        event.preventDefault();
+        await win.hide().catch(() => undefined);
+      });
+    });
+    return () => { disposed = true; unlisten?.(); };
+  }, []);
+
   // Sincronização automática: ao trocar de projeto, envia o que ficou para
   // trás e traz o que há de mais novo do que foi aberto. Nunca sobrescreve
   // silenciosamente em caso de conflito — ver docs/decisions/005 e 007.
+  // Na abertura do app tudo é silencioso (best-effort): erro de nuvem não
+  // pode ser o primeiro greeting do usuário a cada lançamento.
+  const initialSyncRef = useRef(false);
   useEffect(() => {
     const previous = previousProjectRef.current;
     previousProjectRef.current = selectedProjectId;
     if (!isTauriRuntime() || !cloudSyncEnabled) return;
+    const isStartup = !initialSyncRef.current;
+    initialSyncRef.current = true;
     let active = true;
     (async () => {
       if (previous && previous !== selectedProjectId) {
@@ -181,10 +204,10 @@ export function App() {
       if (!selectedProjectId) return;
       try {
         const outcome = await syncProjectNow(selectedProjectId);
-        if (!active) return;
+        if (!active || isStartup) return;
         if (outcome.status === "conflict") setSyncConflict({ projectId: selectedProjectId, message: outcome.message, files: outcome.conflictFiles ?? [] });
         else if (outcome.status !== "disabled") setSyncStatus(outcome.message);
-      } catch (error) { if (active) setSyncStatus(String(error)); }
+      } catch (error) { if (active && !isStartup) setSyncStatus(String(error)); }
     })();
     return () => { active = false; };
   }, [selectedProjectId, cloudSyncEnabled]);

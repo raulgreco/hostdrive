@@ -31,6 +31,7 @@ use std::{
     collections::{BTreeMap, HashMap, HashSet},
     fs,
     path::{Path, PathBuf},
+    sync::{Mutex, OnceLock},
     time::{SystemTime, UNIX_EPOCH},
 };
 use tauri::State;
@@ -1491,25 +1492,52 @@ fn derive_key(passphrase: &str, salt: &[u8]) -> Result<[u8; 32], String> {
 
 // ------------------------------------------------------------------ chaveiro
 
+/// Memoização por processo das leituras do chaveiro. No macOS, cada chamada
+/// de leitura pode disparar o prompt de permissão ("deseja usar as
+/// informações confidenciais…") quando a assinatura do app muda — sem
+/// cache, o app pedia a senha do sistema muitas vezes por lançamento
+/// (relatado em 2026-11-11). Com cache, o máximo é um prompt por item
+/// secreto por lançamento (e zero depois de "Permitir Sempre").
+fn secret_cache() -> &'static Mutex<HashMap<String, Option<String>>> {
+    static CACHE: OnceLock<Mutex<HashMap<String, Option<String>>>> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
 fn read_secret(user: &str) -> Result<Option<String>, String> {
-    let entry = Entry::new(KEYRING_SERVICE, user).map_err(|error| error.to_string())?;
-    match entry.get_password() {
-        Ok(value) => Ok(Some(value)),
-        Err(keyring::Error::NoEntry) => Ok(None),
-        Err(error) => Err(format!("falha ao ler o chaveiro do sistema: {error}")),
+    if let Ok(cache) = secret_cache().lock() {
+        if let Some(cached) = cache.get(user) {
+            return Ok(cached.clone());
+        }
     }
+    let entry = Entry::new(KEYRING_SERVICE, user).map_err(|error| error.to_string())?;
+    let value = match entry.get_password() {
+        Ok(value) => Some(value),
+        Err(keyring::Error::NoEntry) => None,
+        Err(error) => return Err(format!("falha ao ler o chaveiro do sistema: {error}")),
+    };
+    if let Ok(mut cache) = secret_cache().lock() {
+        cache.insert(user.to_string(), value.clone());
+    }
+    Ok(value)
 }
 
 fn write_secret(user: &str, value: &str) -> Result<(), String> {
     let entry = Entry::new(KEYRING_SERVICE, user).map_err(|error| error.to_string())?;
     entry
         .set_password(value)
-        .map_err(|error| format!("falha ao gravar no chaveiro do sistema: {error}"))
+        .map_err(|error| format!("falha ao gravar no chaveiro do sistema: {error}"))?;
+    if let Ok(mut cache) = secret_cache().lock() {
+        cache.insert(user.to_string(), Some(value.to_string()));
+    }
+    Ok(())
 }
 
 fn delete_secret(user: &str) {
     if let Ok(entry) = Entry::new(KEYRING_SERVICE, user) {
         let _ = entry.delete_credential();
+    }
+    if let Ok(mut cache) = secret_cache().lock() {
+        cache.remove(user);
     }
 }
 
