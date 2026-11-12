@@ -1,106 +1,237 @@
-# Eureka42 — Universal CLI
+<p align="center">
+  <img src="docs/images/logo.svg" alt="Eureka42 — Universal CLI" width="440">
+</p>
 
-**Site oficial:** [eureka42.org](https://eureka42.org)
+<p align="center">
+  <strong>Um orquestrador desktop local-first para qualquer CLI de IA.</strong><br>
+  Codex · Claude Code · OpenCode · Kimi · Gemini · Aider · Cursor · Amp · Goose · Qwen · <em>a sua também</em>
+</p>
 
-Aplicativo desktop local-first para organizar **qualquer CLI de IA** (Codex, Claude Code, OpenCode, Kimi, Gemini, Aider, Cursor, Amp, Goose, Qwen — ou qualquer executável que você registrar) em projetos, terminais PTY reais e um histórico compartilhado independente dos fornecedores.
+<p align="center">
+  <img src="https://img.shields.io/badge/versão-0.1.0-teal" alt="Versão 0.1.0">
+  <img src="https://img.shields.io/badge/Tauri_2-24C8D8?logo=tauri&logoColor=white" alt="Tauri 2">
+  <img src="https://img.shields.io/badge/Rust-000000?logo=rust&logoColor=white" alt="Rust">
+  <img src="https://img.shields.io/badge/React_19-20232A?logo=react" alt="React 19">
+  <img src="https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white" alt="TypeScript">
+  <img src="https://img.shields.io/badge/SQLite_FTS5-07405E?logo=sqlite&logoColor=white" alt="SQLite FTS5">
+  <img src="https://img.shields.io/badge/macOS-Windows-Linux-lightgrey" alt="macOS · Windows · Linux">
+</p>
 
-## Versão 0.1.0
+<p align="center">
+  <img src="docs/images/splash.png" alt="Splash Eureka42 Universal CLI" width="560">
+</p>
 
-- **Agentes dinâmicos**: catálogo ampliado de CLIs + agentes personalizados (qualquer executável do PATH). Um agente só aparece na UI depois que você conecta — os não conectados ficam invisíveis. Adicione pelo "＋" ao lado das abas ou pelo `///agente <id>`.
-- Até seis terminais independentes por projeto, com xterm.js e PTY real (ConPTY no Windows).
-- **Contexto universal entre conversas**: o Eureka42 mantém `.eureka42/contexto.md` no projeto (memória + tarefas em aberto + conversas recentes) e injeta esse contexto nas novas sessões do Claude Code (flag validada `--append-system-prompt`). Nos demais agentes, o contexto está no arquivo para apontar ou colar. Desligável em Configurações → Privacidade.
-- Projetos recentes, busca, favoritos e arquivamento lógico.
-- Histórico SQLite com FTS5, filtros, detalhes e exportação Markdown/JSON/TXT.
-- Memória estruturada e tarefas por projeto com proveniência; painel "Contexto" mostra o agregado e permite copiar.
-- Estado Git somente leitura, sem commits, stash ou reset automáticos.
-- Pacotes UAHP 1.0 para continuidade explícita entre agentes.
-- Configurações locais de privacidade, captura e tema (sistema/claro/escuro).
-- Retomada de sessão nativa quando o agente expõe o comando (`codex resume --last`, `--continue` em Claude/OpenCode/Kimi) — sempre validada no binário instalado, nunca presumida.
-- Comando do orquestrador `///agente <id>` / `///retomar` / `///ajuda` com paleta de sugestões, sem nunca interferir no stream do terminal.
-- Atalhos: `Cmd/Ctrl+K` (comando do orquestrador), `Cmd/Ctrl+N` (novo terminal), `Cmd/Ctrl+,` (Configurações), `Esc` (fechar diálogo).
-- **Sincronização via sua própria nuvem** — Google Drive ou OneDrive (um provedor ativo por vez, escolhido em Configurações → Nuvem):
-  - A conta que você já tem é a identidade: mesmo e-mail em outra máquina = mesmo trabalho. Sem conta Eureka42, sem servidor nosso.
-  - Login só por OAuth (PKCE) no Google ou na Microsoft (Client ID gerado por você, guia embutido nas Configurações); tokens só no chaveiro do sistema.
-  - Tudo cifrado no cliente antes de sair da máquina (AES-256-GCM + Argon2) — nem o provedor vê o conteúdo.
-  - Sincroniza memória, tarefas, contexto, pacotes UAHP, preferências e agentes personalizados.
-  - **Arquivos do projeto** espelhados com opt-in por projeto (exceto `.git`, dependências, arquivos de segredo e > 4 MiB); `.eureka42/contexto.md` viaja junto. Nunca apaga arquivos; conflitos sempre perguntam.
-  - Histórico de terminal é opt-in por projeto (pode conter segredos). Ver `docs/decisions/007-multi-cloud-sync.md` e `docs/decisions/008-cloud-providers-google-onedrive.md`.
-- Funcionamento sem conta própria; tudo funciona offline — a nuvem é espelho opcional.
+---
 
-## Privacidade
+## O que é o Universal-CLI?
 
-O núcleo, o SQLite, a memória e os pacotes ficam no computador. As CLIs oficiais podem acessar seus próprios provedores conforme a autenticação do usuário. Credenciais não são copiadas entre agentes. A redação de exportações é básica e toda exportação deve ser revisada antes de compartilhamento.
+O **Universal-CLI** (nome de produto: *Eureka42 — Universal CLI*) é um aplicativo
+desktop de código aberto que organiza **qualquer interface de linha de comando de
+IA** em projetos reais: ele detecta as CLIs instaladas na sua máquina, abre cada uma
+em um **terminal PTY verdadeiro** (a TUI completa, sem simulação), guarda histórico,
+memória e tarefas por projeto — e sincroniza tudo, cifrado, com **a sua própria
+nuvem** (Google Drive ou OneDrive).
+
+Você não cria conta em mais nada: **a conta que você já tem é a identidade**. Mesmo
+e-mail em outra máquina = mesmo trabalho.
+
+## O manifesto Eureka42
+
+> **Eureka** é o instante da descoberta. **42** é a resposta. **⌘** é o atalho.
+
+O nome resume a filosofia do projeto:
+
+1. **Local-first radical.** O núcleo, o banco, a memória e os seus dados ficam no
+   seu computador. Não existe servidor Eureka42, conta própria, telemetria ou
+   sincronização obrigatória. A nuvem é um espelho opcional — e é a *sua*.
+2. **Qualquer agente, sem imitação.** O app não reproduz CLIs: ele executa os
+   binários reais que você instalou, preservando TUI, autenticação, MCP, skills,
+   plugins e permissões de cada ferramenta. Se amanhã existir uma CLI nova, você a
+   registra e ela passa a funcionar — sem esperar atualização nossa.
+3. **Você é o dono do contexto.** Memória universal por projeto, tarefas com
+   proveniência e pacotes de handoff **verificáveis** (UAHP 1.0): a troca de agente
+   transmite um pacote explícito e auditável, nunca o estado oculto de um modelo.
+4. **Capacidade só com evidência.** Cada adaptador declara o que foi validado no
+   binário real instalado — retomada de sessão, flags, versões. Nada é presumido
+   pela documentação; o que não foi testado é dito.
+5. **Sem clichê de IA.** Nem cérebros, nem robôs, nem degradê roxo. Interface
+   escura sobre a grade 42, tipografia Inter/Montserrat/JetBrains Mono e o
+   *Baralho de Chips* — fichas de cor por função, como um baralho na mesa.
+6. **Código aberto.** O projeto é público e construído às claras, com o histórico
+   de decisões em `docs/decisions/`.
+
+## Como é a interface
+
+<p align="center">
+  <img src="docs/images/main-window.png" alt="Janela principal do Eureka42" width="840">
+</p>
+
+O coração da UI é o **Baralho de Chips** — cada função é uma ficha de cor na mesa:
+
+<p align="center">
+  <img src="docs/images/chips.png" alt="Baralho de Chips" width="300">
+</p>
+
+| Ficha | Função |
+|---|---|
+| 🟩 **T-01 Terminal** | Até 6 terminais PTY independentes por projeto, com xterm.js |
+| 🟪 **H-02 Histórico** | Sessões e eventos persistentes, busca FTS5, filtros, exportação |
+| 🟨 **M-03 Memória** | Memória estruturada, tarefas e o contexto universal do projeto |
+| 🟩 **G-04 Git** | Estado do repositório somente leitura — nunca commit/stash automáticos |
+| 🟫 **K-05 Tarefas** | Tarefas por projeto com proveniência de quem criou |
+
+## Funcionalidades
+
+- **Agentes dinâmicos** — catálogo ampliado (Codex, Claude Code, OpenCode, Kimi,
+  Gemini, Aider, Cursor Agent, Amp, Goose, Qwen) **+ agentes personalizados**:
+  qualquer executável do seu PATH vira um agente. O botão **"Escolha seu agente"**
+  conecta na hora; cada aba tem × para encerrar a sessão sem perder histórico.
+- **Terminal real** — PTY nativo (`portable-pty`: ConPTY no Windows) com
+  `xterm-256color`, resize, Unicode e sinais. A TUI de cada CLI aparece íntegra.
+- **Contexto universal entre conversas** — o app mantém `.eureka42/contexto.md` no
+  projeto (memória + tarefas em aberto + conversas recentes) e o injeta nas novas
+  sessões do Claude Code via `--append-system-prompt`; nos demais agentes o
+  contexto fica no arquivo, pronto para apontar ou colar. Desligável na privacidade.
+- **Histórico pesquisável** — SQLite com FTS5: busca por projeto, agente, período,
+  estado e texto; detalhe de eventos e exportação Markdown/JSON/TXT.
+- **Handoff verificável (UAHP 1.0)** — pacote explícito com manifesto, memória,
+  tarefas e contexto para trocar de agente sem perder o fio da meada.
+- **Retomada nativa quando suportada** — `codex resume --last`, `--continue` em
+  Claude/OpenCode/Kimi — sempre validada no binário instalado, nunca presumida.
+- **Sincronização pela sua nuvem** — Google Drive ou OneDrive, OAuth PKCE com o seu
+  próprio Client ID, tokens só no chaveiro do SO, tudo cifrado no cliente
+  (AES-256-GCM + Argon2) antes de sair da máquina. Sincroniza preferências,
+  agentes personalizados, memória, tarefas, contexto e — com opt-in por projeto —
+  arquivos (exceto `.git`, dependências e segredos; nunca apaga; conflitos perguntam).
+- **Funciona offline** — sem nuvem configurada, tudo continua funcionando localmente.
+- **Atualização automática** — `tauri-plugin-updater` com pacotes assinados
+  publicados em CI como rascunho (release só sai por publicação manual).
+
+## Linguagens e tecnologias
+
+O projeto usa deliberadamente **três linguagens**, cada uma onde faz mais sentido:
+
+| Linguagem | Onde atua | Por quê |
+|---|---|---|
+| **Rust** (~60% do núcleo) | Todo o backend Tauri: PTY, processos, SQLite, FTS5, criptografia, OAuth, sync, chaveiro | Segurança de memória sem GC, binário nativo único, acesso direto a APIs do SO |
+| **TypeScript** (~35%) | Toda a UI: React 19, componentes, serviços de invoke tipados | Tipagem estática no frontend, ecossistema maduro de componentes |
+| **SQL** | Esquema e consultas do SQLite (WAL + FTS5) | Busca full-text indexada e persistência transacional declarativas |
+
+**Ferramentas:** Tauri 2 · React 19 + Vite 8 · xterm.js · `portable-pty` ·
+SQLite FTS5 · GitHub Actions (CI macOS/Windows/Linux) · assinatura minisign do updater.
+
+## Arquitetura
+
+```mermaid
+flowchart LR
+    subgraph FE["Frontend — React 19 + TypeScript (no bundle)"]
+        UI["Baralho de Chips<br/>Terminal · Histórico · Memória · Git · Tarefas"]
+        XT["xterm.js"]
+    end
+    subgraph CORE["Núcleo — Tauri 2 · Rust"]
+        AG["agents<br/>detecção + adaptadores"]
+        TM["terminal<br/>PTY / ConPTY"]
+        PR["projects + history<br/>eventos + FTS5"]
+        MM["memory + handoff<br/>UAHP 1.0"]
+        SY["sync<br/>OAuth PKCE · AES-256-GCM"]
+    end
+    DB[("SQLite WAL + FTS5<br/>(arquivo local)")]
+    CLD{{"Google Drive / OneDrive<br/>espelho cifrado opcional"}}
+    FE <-- "invoke tipado" --> CORE
+    PR --- DB
+    SY --- CLD
+    XT --- TM
+```
+
+Comunicação com provedores de IA **somente** pelas CLIs que você instalou e
+autenticou — o app nunca toca nos tokens delas.
+
+## Fluxo de sincronização
+
+```mermaid
+sequenceDiagram
+    participant App as Universal-CLI
+    participant IdP as Google / Microsoft
+    participant Drive as Drive / OneDrive
+    App->>IdP: OAuth 2.0 + PKCE (seu próprio Client ID)
+    IdP-->>App: tokens (só no chaveiro do SO, com renovação)
+    App->>App: cifra o pacote local<br/>AES-256-GCM (chave via Argon2 da sua frase)
+    App->>Drive: grava na pasta oculta do app
+    Note over App,Drive: outra máquina, mesmo e-mail:<br/>mesmo trabalho, mesmo histórico, mesmos agentes
+```
+
+## Agentes suportados
+
+| Agente | Detecção automática | Retomada nativa validada |
+|---|---|---|
+| Codex CLI | ✅ | `codex resume --last` |
+| Claude Code | ✅ | `--continue` |
+| OpenCode | ✅ | `--continue` |
+| Kimi Code CLI | ✅ | `--continue` |
+| Gemini · Aider · Cursor · Amp · Goose · Qwen | ✅ se instalados | conforme a CLI expuser |
+| **Qualquer executável** | ✅ agente personalizado | — |
+
+A detecção procura nos diretórios padrão de cada SO (incluindo `PATHEXT` e
+shims `.cmd` no Windows). Detalhes em `docs/03-AGENTES-E-TERMINAL.md`.
+
+## Instalação
+
+Baixe o pacote da sua plataforma na [página de Releases](../../releases)
+(o CI builda **macOS** `.dmg`, **Windows** `.exe`/`.msi` e **Linux** `.deb`/`.AppImage`).
+
+**macOS** (Apple Silicon): a build atual usa **assinatura ad-hoc** — no primeiro
+clique, use botão direito → Abrir (ou `xattr -dr com.apple.quarantine Eureka42.app`).
+Notarização Apple Developer ainda não configurada.
+
+**Windows**: o instalador NSIS embute o bootstrapper do WebView2 e oferece
+PT-BR/EN; modo de instalação "só para mim" ou "todos os usuários".
+
+**Linux** (Ubuntu/Debian): `sudo dpkg -i Eureka42_0.1.0_amd64.deb` (resolve as
+deps `libwebkit2gtk-4.1`/`libgtk-3` pelo apt) — ou rode o `Eureka42_0.1.0_amd64.AppImage`
+direto: `chmod +x` e pronto.
 
 ## Desenvolvimento
 
 ```bash
-npm install
-npm run build
-npm test
-cargo test --manifest-path src-tauri/Cargo.toml
-npm run tauri dev
+npm install                # dependências do frontend
+npm run build              # typecheck + bundle Vite
+npm test                   # 6 testes Vitest
+cargo test --manifest-path src-tauri/Cargo.toml   # 32 testes Rust
+npm run tauri dev          # app em modo desenvolvimento
+npm run tauri -- build     # .app/.exe/.deb/.AppImage + artefatos do updater
 ```
 
-## Distribuição
+Requisitos: Rust estável + Node 20+. No Linux, instale antes
+`libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev`.
 
-### macOS
+## Documentação
 
-A primeira build validada é macOS Apple Silicon (`arm64`). O pacote atual usa **assinatura ad-hoc** (sem certificado Apple Developer nem notarização).
+A especificação completa vive em `docs/` (em português):
 
-**Requisitos para instalar/testar no macOS:**
-- macOS com Apple Silicon (M1/M2/M3/M4) — a build atual não é `universal` nem `x86_64`, só `arm64`.
-- Como o app não é notarizado, o Gatekeeper vai bloquear a abertura direta (duplo clique mostra "não pode ser aberto"). Para abrir: **clique com o botão direito (ou Control+clique) no app → Abrir**, e confirme no diálogo. É preciso fazer isso apenas na primeira execução.
-- Sem dependências externas: não precisa de Node, Rust ou Xcode instalados para *rodar* o app — só para compilar.
-- As quatro CLIs (Codex, Claude Code, OpenCode, Kimi) são detectadas automaticamente se estiverem no `PATH`, `/opt/homebrew/bin`, `/usr/local/bin`, `~/.local/bin`, `~/.kimi-code/bin` ou `~/.cargo/bin`; nenhuma é obrigatória para abrir o app.
+| Documento | Conteúdo |
+|---|---|
+| [00 — Prompt mestre](docs/00-PROMPT-MESTRE.md) | missão, princípios e método do projeto |
+| [01 — Requisitos](docs/01-REQUISITOS.md) | requisitos funcionais e NFRs |
+| [02 — Arquitetura](docs/02-ARQUITETURA.md) | decisões de arquitetura |
+| [03 — Agentes e Terminal](docs/03-AGENTES-E-TERMINAL.md) | adaptadores, PTY, capacidades |
+| [04 — Memória e Histórico](docs/04-MEMORIA-E-HISTORICO.md) | modelo de memória e eventos |
+| [05 — Transferência de Contexto](docs/05-TRANSFERENCIA-CONTEXTO.md) | handoff e UAHP 1.0 |
+| [06 — Segurança](docs/06-SEGURANCA.md) | ameaças, mitigações, chaveiro |
+| [07 — Interface](docs/07-INTERFACE.md) | diretrizes de UI |
+| [08 — Plano de Implementação](docs/08-PLANO-IMPLEMENTACAO.md) | fases e escopo |
+| [09 — Testes e Aceite](docs/09-TESTES-E-ACEITE.md) | cenários de aceite |
+| [implementation-status](docs/implementation-status.md) | estado real da implementação, com o que está `NOT_VERIFIED` |
+| [decisions/](docs/decisions/) | histórico de decisões arquiteturais |
 
-Build/empacotamento:
+## Privacidade e segurança
 
-```bash
-npm run tauri -- build --bundles app,dmg   # ou só "app" se o DMG falhar (ver abaixo)
-```
+- Núcleo, SQLite, memória e pacotes: **no seu disco**, em formato aberto.
+- Credenciais de nuvem: **somente no chaveiro do SO** (Keychain / Credential Manager).
+- Pacotes sincronizados são cifrados no cliente (AES-256-GCM + Argon2) — nem o
+  provedor de nuvem lê o conteúdo.
+- Histórico de terminal é **opt-in por projeto** (pode conter segredos).
+- Sem telemetria, sem analytics, sem chamadas a servidores do projeto.
+- Git é somente leitura: nunca commit, stash, push ou reset automáticos.
 
-Neste ambiente de desenvolvimento específico, a geração do **DMG** falha porque o passo de "deixar bonito" do `create-dmg` pede ao Finder para posicionar ícones via AppleScript, e esse processo sandbox não tem permissão de Acessibilidade concedível sem uma sessão gráfica interativa (erro `-1712`, timeout de AppleEvent). Isso **não é um bug do app** — é uma limitação deste ambiente de automação. Alternativa usada: compactar o `.app` em ZIP, que se instala do mesmo jeito (descompactar e arrastar para `/Applications`):
-
-```bash
-cd src-tauri/target/release/bundle/macos
-ditto -c -k --sequesterRsrc --keepParent "Eureka42.app" "Eureka42_0.1.0_macOS-arm64.zip"
-```
-
-Em uma máquina com sessão de usuário normal (não este sandbox), `--bundles app,dmg` deve gerar o DMG sem esse problema.
-
-### Windows
-
-A build Windows x64 (`.exe`, `.dll` e instalador NSIS) é gerada por **cross-compilação a partir deste Mac** (`docs/decisions/002-windows-cross-compilation.md`):
-
-```bash
-npm run tauri -- build --runner cargo-xwin --target x86_64-pc-windows-msvc --bundles nsis
-```
-
-Requer `rustup target add x86_64-pc-windows-msvc`, `brew install llvm lld makensis` e `cargo install xwin cargo-xwin` previamente.
-
-O instalador (`Eureka42_0.1.0_x64-setup.exe`) foi configurado para ser amigável a quem vai testar (`src-tauri/tauri.conf.json`):
-- Seletor de idioma na abertura (Português do Brasil / Inglês).
-- Escolha entre instalar só para o usuário atual ou para todos (não força administrador a menos que a pessoa escolha "todos os usuários").
-- Bootstrapper do WebView2 embutido no instalador — na maioria das máquinas Windows 10/11 atuais o WebView2 já vem pré-instalado, então esse passo não faz nada perceptível; se faltar, o instalador busca e instala automaticamente (precisa de internet nesse caso).
-- Ícone próprio do app (antes o bundle não tinha nenhum ícone configurado — corrigido).
-
-Os binários são PE32+ válidos e o instalador é um NSIS PE32 GUI válido (tudo verificado neste Mac), mas a execução real em Windows (abrir janela, WebView2, PTY/ConPTY com as quatro CLIs) permanece `NOT_VERIFIED` — não há host ou VM Windows disponível para testar aqui. Assinatura de código e instalador MSI (WiX) também não estão disponíveis neste host; só NSIS.
-
-## Sincronização via Google Drive ou OneDrive
-
-Em Configurações → Nuvem: escolha o provedor, informe um **Client ID** OAuth gerado por você (o guia de registro está embutido na tela) e clique **Conectar conta** — o login abre no navegador e os tokens ficam só no chaveiro do sistema. Defina também uma **frase de criptografia** (cifra os dados antes de saírem da máquina — nem o provedor vê o conteúdo); ela fica só no chaveiro. Com a sincronização ativada, abrir ou trocar de projeto traz o que há de mais novo; trocar de projeto envia o que mudou. Em caso de mudanças nas duas pontas ao mesmo tempo, o app pergunta qual versão manter — nunca decide sozinho. Histórico de terminal fica de fora por padrão; ative por projeto se quiser incluí-lo. Detalhes em `docs/decisions/007-multi-cloud-sync.md` e `docs/decisions/008-cloud-providers-google-onedrive.md`.
-
-## Atualização automática
-
-O app consulta `https://github.com/raulgreco/hostdrive/releases/latest/download/latest.json` ao abrir; se houver versão mais nova, mostra um aviso — **nada é baixado ou instalado sem o usuário clicar "Atualizar agora"**. Toda atualização é assinada; o app recusa instalar qualquer pacote sem a assinatura correta. Detalhes em `docs/decisions/006-auto-update.md`.
-
-**Para publicar uma versão nova:**
-1. Atualize `"version"` em `src-tauri/tauri.conf.json`.
-2. `git commit` e `git push`.
-3. `git tag v0.1.1 && git push origin v0.1.1` (troque pelo número real).
-4. O GitHub Actions builda macOS e Windows automaticamente e cria uma **Release em rascunho** com os instaladores e o `latest.json` assinados.
-5. Revise o rascunho em https://github.com/raulgreco/hostdrive/releases e clique em **Publish release** — só a partir daí os usuários recebem o aviso de atualização.
-
-A chave privada de assinatura vive em `~/.hostdrive-keys/hostdrive-updater.key` (fora do repositório) e como secret `TAURI_SIGNING_PRIVATE_KEY` no GitHub — **faça backup desse arquivo**; perdê-lo significa não poder mais assinar atualizações para quem já instalou o app.
-
-Consulte `docs/implementation-status.md` para evidências e limitações verificadas, `docs/decisions/003-resume-palette-theme.md` para as decisões de retomada de sessão/paleta/tema, `docs/decisions/004-windows-executable-detection-fix.md` para a correção de detecção de agentes no Windows, `docs/decisions/007-multi-cloud-sync.md` para a sincronização via Google Drive/OneDrive e `docs/decisions/008-cloud-providers-google-onedrive.md` para a remoção do Nextcloud, e `docs/decisions/006-auto-update.md` para a atualização automática.
+**Site:** [eureka42.org](https://eureka42.org) ·
+**Issues e PRs são bem-vindos.**
