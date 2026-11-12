@@ -1,8 +1,32 @@
 # Estado da implementação
 
-Atualizado em 2026-11-11. **Correções e melhorias de uso real** (relatadas pelo
+Atualizado em 2026-11-12. **Correções e melhorias de uso real** (relatadas pelo
 usuário ao testar o app no Mac): botão Fechar nativo quebrado, fluxo de agentes
 confuso, fontes pequenas, splash mais longo, histórico por projeto na sidebar.
+
+**2026-11-12 — Linux no CI e builds atualizados**: o workflow de release
+(`.github/workflows/release.yml`) ganhou `ubuntu-latest` na matrix
+(`--bundles deb,appimage`; deps `libwebkit2gtk-4.1-dev`, `libgtk-3-dev`,
+`libayatana-appindicator3-dev`, `librsvg2-dev`, `libxdo-dev`, `libssl-dev`) —
+tags futuras publicam Linux automaticamente junto com macOS e Windows; job
+`linux-build` exclusivo de `workflow_dispatch` assina o updater com os secrets
+(run `43148020431` verde). Pasta de builds atualizada:
+`Eureka42_0.1.0_amd64.deb` (Debian 2.0 íntegro, `Package: eureka42`),
+`Eureka42_0.1.0_amd64.AppImage` (ELF x86-64), `Eureka42_0.1.0_x64-setup.exe`
+(PE32+ validado) e `Eureka42_0.1.0_macOS-arm64.zip` — todos estruturalmente
+validados; **execução real em Linux e Windows continua `NOT_VERIFIED`**
+(usar: `sudo dpkg -i` no Ubuntu/Debian, `chmod +x` no AppImage).
+
+**2026-11-12 — migração idempotente**: o backfill do toggle legado só roda
+quando o provedor é inválido e a invariante
+`cloud_sync_enabled=0 WHERE cloud_provider NOT IN ('google','onedrive')`
+autocorrige o DB a cada launch — DB real do usuário verificado
+(`provider=[] sync=0`), sem reescrever a preferência do usuário.
+
+**2026-11-12 — conta GitHub eureka42-ai**: a partir desta data os commits são
+autorados como `eureka42-ai <eureka42@eureka42.org>`; a conta foi adicionada
+como colaboradora do repo (convite pendente de aceite no GitHub). A conta
+`raulgreco` segue autenticada no `gh` como inativa.
 
 **2026-11-11 — botão Fechar do macOS (root cause encontrado)**: o app testado
 hoje de manhã era um binário **obsoleto** de `npm run tauri -- build` (00:15),
@@ -153,7 +177,7 @@ A primeira versão funcional para macOS está concluída, incluindo os três req
 
 1. **Testar o fluxo de nuvem com contas reais** (Google Drive / OneDrive / Nextcloud): criar os Client IDs OAuth (guia embutido em Configurações → Nuvem) e exercitar login, sync de dados e sync de arquivos. Ainda `NOT_VERIFIED`.
 2. **Decisão pendente do usuário**: registrar Client IDs próprios do projeto (Google Cloud + Microsoft Entra) para usuários finais conectarem sem ver código — ou manter o modelo "cada um com seu ID".
-3. **Teste real no Windows** (execução do instalador NSIS, ConPTY, detecção de agentes) — CI builda, execução humana pendente.
+3. **Teste real no Windows** (execução do instalador NSIS, ConPTY, detecção de agentes) e **teste real no Linux** (`.deb`/`AppImage` da pasta de builds) — CI builda, execução humana pendente.
 4. **Site**: apontar para eureka42.org (feito nos arquivos; o domínio precisa existir/apontar).
 5. **Repositório**: decidir renomear `github.com/raulgreco/hostdrive` para a marca (afeta o endpoint do auto-update; o updater publica em rascunho, então a troca é segura antes da primeira release pública).
 6. Publicar release v0.2.0 (tag) quando os itens 1–3 tiverem evidência — o CI gera macOS + Windows automaticamente.
