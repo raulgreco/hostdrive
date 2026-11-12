@@ -171,13 +171,21 @@ pub fn get_cloud_status(repository: State<'_, ProjectRepository>) -> Result<Clou
         // explícita do usuário, não padrão (2026-11-11).
         _ => (false, settings.cloud_account.clone()),
     };
+    // Frase de criptografia só é relevante com provedor escolhido — sem
+    // provedor nem lemos o chaveiro (cada leitura pode virar um prompt de
+    // permissão no macOS).
+    let has_passphrase = if provider.is_empty() {
+        false
+    } else {
+        read_secret(KEYRING_PASSPHRASE_USER)?.is_some()
+    };
     Ok(CloudStatus {
         provider: provider.clone(),
         provider_label: provider_label(&provider).to_string(),
         sync_enabled: settings.cloud_sync_enabled,
         configured,
         account,
-        has_passphrase: read_secret(KEYRING_PASSPHRASE_USER)?.is_some(),
+        has_passphrase,
     })
 }
 
