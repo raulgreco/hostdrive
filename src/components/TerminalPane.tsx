@@ -160,6 +160,13 @@ export function TerminalPane({ agents, connectedAgents, workingDirectory, active
     void startSession(agentId, agent?.supportsResume ?? false);
   }
 
+  /** Agente já conectado (tem aba): o picker apenas abre a aba dele. */
+  function openConnected(agentId: string) {
+    setActiveAgent(agentId);
+    unhideAgent(agentId);
+    closePicker();
+  }
+
   async function registerCustom() {
     setAddError(null);
     try {
@@ -209,8 +216,6 @@ export function TerminalPane({ agents, connectedAgents, workingDirectory, active
     setPickerPos(null);
   }
 
-  const unconnectedInstalled = agents.filter((agent) => !connectedAgents.some((connected) => connected.id === agent.id));
-
   return <main className={active ? "workspace" : "workspace workspace--inactive"} aria-hidden={!active}>
     <div className="agent-tabs" role="tablist" aria-label="Agentes conectados">
       {visibleConnected.map((agent) => {
@@ -240,9 +245,12 @@ export function TerminalPane({ agents, connectedAgents, workingDirectory, active
           Escolha seu agente
         </button>
         {pickerOpen && pickerPos ? <div className="agent-picker" style={{ position: "fixed", top: pickerPos.top, left: pickerPos.left, right: "auto" }} role="dialog" aria-label="Conectar agente">
-          {unconnectedInstalled.length > 0 ? <><p className="agent-picker-heading">Instalados nesta máquina — clique para conectar</p>{unconnectedInstalled.map((agent) => <button className="agent-picker-row" key={agent.id} onClick={() => connectInstalled(agent.id)}>
-            <span><strong>{agent.label}</strong><small>{agent.version ?? "versão desconhecida"}</small></span><span className="agent-picker-action">Conectar</span>
-          </button>)}</> : null}
+          {agents.length > 0 ? <><p className="agent-picker-heading">Instalados nesta máquina — clique para abrir</p>{agents.map((agent) => {
+            const connected = connectedAgents.some((item) => item.id === agent.id);
+            return <button className="agent-picker-row" key={agent.id} onClick={() => (connected ? openConnected(agent.id) : connectInstalled(agent.id))}>
+              <span><strong>{agent.label}</strong><small>{agent.version ?? "versão desconhecida"}</small></span><span className="agent-picker-action">{connected ? "Abrir" : "Conectar"}</span>
+            </button>;
+          })}</> : null}
           <p className="agent-picker-heading">Qualquer executável</p>
           <label className="agent-picker-field"><span>Nome</span><input value={customLabel} onChange={(event) => setCustomLabel(event.target.value)} placeholder="Minha CLI" aria-label="Nome do agente" /></label>
           <label className="agent-picker-field"><span>Comando</span><input value={customExecutable} onChange={(event) => setCustomExecutable(event.target.value)} placeholder="mycli" aria-label="Comando executável do agente" onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void registerCustom(); } }} /></label>

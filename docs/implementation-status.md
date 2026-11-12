@@ -39,6 +39,15 @@ rotulado "Novo projeto". Controles de janela desenhados pelo app
 (`WindowControls`) ficam dormentes — só renderizam se a janela estiver sem
 decoração nativa.
 
+**2026-11-11 — picker de agentes + nuvem sem padrão**: o picker "Instalados nesta
+máquina" lista **todos** os instalados — os já conectados aparecem como "Abrir"
+(ausência de Claude/Codex na lista era filtro de já-conectados, não falha de
+detecção: ambos estão em `~/.local/bin`, que já era pesquisado). Provedor de
+nuvem **sem padrão**: `cloud_provider` default vazio no banco (era 'nextcloud');
+com provedor vazio o app não toca o chaveiro nem sincroniza; `build_remote` e
+`disconnect_cloud` rejeitam provedor vazio/desconhecido com erro claro em vez
+de cair no Nextcloud.
+
 **Verificações desta rodada**: 31 testes Rust + 6 Vitest + builds verdes;
 app real executado no Mac com capturas de tela: UI nova completa renderizada
 (abas com ×, "Escolha seu agente", histórico na sidebar, fontes maiores);

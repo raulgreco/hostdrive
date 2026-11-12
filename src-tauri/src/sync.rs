@@ -182,10 +182,13 @@ pub fn get_cloud_status(repository: State<'_, ProjectRepository>) -> Result<Clou
     let (configured, account) = match provider.as_str() {
         "google" => (stored_tokens(OAuthProvider::Google)?.is_some(), settings.cloud_account.clone()),
         "onedrive" => (stored_tokens(OAuthProvider::OneDrive)?.is_some(), settings.cloud_account.clone()),
-        _ => (
+        "nextcloud" => (
             read_secret(KEYRING_APP_PASSWORD_USER)?.is_some(),
             settings.cloud_account.clone(),
         ),
+        // Sem provedor escolhido: nunca toca o chaveiro — a nuvem é opção
+        // explícita do usuário, não padrão (2026-11-11).
+        _ => (false, settings.cloud_account.clone()),
     };
     Ok(CloudStatus {
         provider: provider.clone(),
@@ -224,7 +227,8 @@ pub fn disconnect_cloud(repository: State<'_, ProjectRepository>) -> Result<(), 
     match settings.cloud_provider.as_str() {
         "google" => delete_secret(KEYRING_GOOGLE_TOKENS),
         "onedrive" => delete_secret(KEYRING_ONEDRIVE_TOKENS),
-        _ => return Err("para o Nextcloud, remova as credenciais na seção do Nextcloud.".into()),
+        "nextcloud" => return Err("para o Nextcloud, remova as credenciais na seção do Nextcloud.".into()),
+        _ => return Err("nenhum provedor de nuvem selecionado.".into()),
     }
     repository
         .set_cloud_account("")
@@ -1101,7 +1105,10 @@ async fn build_remote(settings: &AppSettings) -> Result<Remote, String> {
             let tokens = ensure_tokens(OAuthProvider::OneDrive, &settings.onedrive_client_id).await?;
             Ok(Remote::OneDrive { access_token: tokens.access_token, client })
         }
-        _ => Ok(Remote::Nextcloud { config: NextcloudConfig::from_settings(settings)?, client }),
+        "nextcloud" => Ok(Remote::Nextcloud { config: NextcloudConfig::from_settings(settings)?, client }),
+        // Sem padrão implícito (2026-11-11): provedor vazio/desconhecido é
+        // erro claro, nunca um fallback silencioso para Nextcloud.
+        _ => Err("nenhum provedor de nuvem selecionado — escolha em Configurações → Nuvem.".into()),
     }
 }
 
@@ -1109,7 +1116,8 @@ fn provider_label(provider: &str) -> &'static str {
     match provider {
         "google" => "Google Drive",
         "onedrive" => "OneDrive",
-        _ => "Nextcloud",
+        "nextcloud" => "Nextcloud",
+        _ => "nenhum provedor",
     }
 }
 

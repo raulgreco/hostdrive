@@ -95,9 +95,10 @@ pub struct AppSettings {    pub(crate) capture_terminal_events: bool,
     /// validada (hoje: Claude Code). Ligado por padrão — é o coração da
     /// promessa de continuidade; usuário pode desligar na Configurações.
     pub(crate) context_carryover_enabled: bool,
-    /// Provedor de nuvem escolhido (2026-11-10): "nextcloud" | "google" |
-    /// "onedrive". `nextcloud_sync_enabled` passa a significar "sincronização
-    /// cloud ativa" para o provedor escolhido.
+    /// Provedor de nuvem escolhido (2026-11-10): "" (nenhum — padrão) |
+    /// "nextcloud" | "google" | "onedrive". `nextcloud_sync_enabled` passa a
+    /// significar "sincronização cloud ativa" para o provedor escolhido.
+    /// Sem padrão implícito: a escolha é sempre do usuário (2026-11-11).
     pub(crate) cloud_provider: String,
     /// Client IDs OAuth do usuário (Google Drive / OneDrive) — não são
     /// segredo; vivem aqui. Tokens ficam só no chaveiro.
@@ -185,7 +186,7 @@ impl ProjectRepository {
         ensure_column(&connection, "projects", "files_sync_enabled", "INTEGER NOT NULL DEFAULT 0")?;
         ensure_column(&connection, "projects", "files_last_sync_at", "INTEGER NOT NULL DEFAULT 0")?;
         ensure_column(&connection, "app_settings", "context_carryover_enabled", "INTEGER NOT NULL DEFAULT 1")?;
-        ensure_column(&connection, "app_settings", "cloud_provider", "TEXT NOT NULL DEFAULT 'nextcloud'")?;
+        ensure_column(&connection, "app_settings", "cloud_provider", "TEXT NOT NULL DEFAULT ''")?;
         ensure_column(&connection, "app_settings", "google_client_id", "TEXT NOT NULL DEFAULT ''")?;
         ensure_column(&connection, "app_settings", "onedrive_client_id", "TEXT NOT NULL DEFAULT ''")?;
         ensure_column(&connection, "app_settings", "cloud_account", "TEXT NOT NULL DEFAULT ''")?;

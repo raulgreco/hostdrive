@@ -3,7 +3,7 @@ import { getAppSettings, updateAppSettings, type AppSettings, type ThemePreferen
 import { clearNextcloudCredentials, connectCloud, disconnectCloud, getCloudStatus, hasNextcloudCredentials, setNextcloudCredentials, testCloudConnection, type CloudStatus } from "../services/sync";
 import { isTauriRuntime } from "../services/terminal";
 
-const defaults: AppSettings = { captureTerminalEvents: true, retentionDays: 90, theme: "dark", nextcloudUrl: "", nextcloudUsername: "", nextcloudSyncEnabled: false, contextCarryoverEnabled: true, cloudProvider: "nextcloud", googleClientId: "", onedriveClientId: "", cloudAccount: "" };
+const defaults: AppSettings = { captureTerminalEvents: true, retentionDays: 90, theme: "dark", nextcloudUrl: "", nextcloudUsername: "", nextcloudSyncEnabled: false, contextCarryoverEnabled: true, cloudProvider: "", googleClientId: "", onedriveClientId: "", cloudAccount: "" };
 
 const SHORTCUTS: Array<{ keys: string; description: string }> = [
   { keys: "⌘/Ctrl + K", description: "Focar o comando do orquestrador (///agente, ///retomar) no terminal ativo" },
@@ -117,7 +117,9 @@ export function SettingsDialog({ open, onClose, onSettingsSaved }: { open: boole
   const usingNextcloud = settings.cloudProvider === "nextcloud";
   const oauthProvider = settings.cloudProvider === "google"
     ? { clientIdKey: "googleClientId" as const, name: "Google Drive", guide: "console.cloud.google.com → APIs e serviços → Tela de permissão OAuth (Externo, app próprio) → Credenciais → Criar ID do cliente → App para computador. Escopos não precisam ser configurados manualmente — o Eureka42 pede drive.appdata + e-mail no login." }
-    : { clientIdKey: "onedriveClientId" as const, name: "OneDrive", guide: "entra.microsoft.com → Entra ID (ou Registros de aplicativo) → Novo registro → Plataforma → Aplicativo móvel e desktop → URI de redirecionamento http://127.0.0.1 → copie o ID do aplicativo (cliente). Escopos não precisam ser configurados manualmente — o Eureka42 pede Files.ReadWrite.AppFolder + e-mail no login." };
+    : settings.cloudProvider === "onedrive"
+      ? { clientIdKey: "onedriveClientId" as const, name: "OneDrive", guide: "entra.microsoft.com → Entra ID (ou Registros de aplicativo) → Novo registro → Plataforma → Aplicativo móvel e desktop → URI de redirecionamento http://127.0.0.1 → copie o ID do aplicativo (cliente). Escopos não precisam ser configurados manualmente — o Eureka42 pede Files.ReadWrite.AppFolder + e-mail no login." }
+      : null;
 
   return <div className="settings-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <section className="settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title">
@@ -146,15 +148,16 @@ export function SettingsDialog({ open, onClose, onSettingsSaved }: { open: boole
           </> : null}
           {section === "cloud" ? <>
             <h3>Sincronização via nuvem</h3>
-            <p className="settings-note">Escolha <em>uma</em> nuvem — a conta que você já tem é a identidade: ao abrir o Eureka42 em outro computador com a mesma conta e sincronizar, você recupera histórico, contexto e arquivos dos projetos. Tudo é cifrado antes de sair desta máquina; nem o provedor vê o conteúdo. Histórico de terminal e arquivos de projeto ficam de fora por padrão (ative por projeto).</p>
+            <p className="settings-note">Escolha <em>uma</em> nuvem — a conta que você já tem é a identidade: ao abrir o Eureka42 em outro computador com a mesma conta e sincronizar, você recupera histórico, contexto e arquivos dos projetos. Tudo é cifrado antes de sair desta máquina; nem o provedor vê o conteúdo. Histórico de terminal e arquivos de projeto ficam de fora por padrão (ative por projeto). <strong>Nenhuma fica pré-selecionada</strong> — a escolha é sempre sua, e o app funciona 100% local sem nenhuma.</p>
             <div className="theme-picker" role="radiogroup" aria-label="Provedor de nuvem">
               {PROVIDERS.map((provider) => <button key={provider.id} role="radio" aria-checked={settings.cloudProvider === provider.id} className={settings.cloudProvider === provider.id ? "theme-option theme-option--active" : "theme-option"} onClick={() => setSettings((current) => ({ ...current, cloudProvider: provider.id }))}>{provider.label}</button>)}
             </div>
+            {settings.cloudProvider === "" ? <p className="settings-note">Nenhuma nuvem selecionada — modo local puro. Escolha um provedor acima para configurar a conexão quando quiser.</p> : <>
             <label className="settings-toggle"><div><strong>Ativar sincronização</strong><p>Ao abrir um projeto, traz dados mais novos da nuvem; ao trocar de projeto ou fechar o app, envia o que mudou aqui.</p></div><input type="checkbox" checked={settings.nextcloudSyncEnabled} onChange={(event) => setSettings((current) => ({ ...current, nextcloudSyncEnabled: event.target.checked }))} /></label>
             {usingNextcloud ? <>
               <label className="settings-field"><span>Endereço do servidor</span><input className="settings-text-input" value={settings.nextcloudUrl} onChange={(event) => setSettings((current) => ({ ...current, nextcloudUrl: event.target.value }))} placeholder="https://nuvem.exemplo.com" /></label>
               <label className="settings-field"><span>Usuário</span><input className="settings-text-input" value={settings.nextcloudUsername} onChange={(event) => setSettings((current) => ({ ...current, nextcloudUsername: event.target.value }))} placeholder="raul" /></label>
-            </> : <>
+            </> : oauthProvider ? <>
               <p className="settings-note"><strong>Como obter o Client ID ({oauthProvider.name}):</strong> {oauthProvider.guide}</p>
               <label className="settings-field"><span>Client ID</span><input className="settings-text-input" value={settings[oauthProvider.clientIdKey]} onChange={(event) => setSettings((current) => ({ ...current, [oauthProvider.clientIdKey]: event.target.value }))} placeholder={settings.cloudProvider === "google" ? "xxxx.apps.googleusercontent.com" : "00000000-0000-0000-0000-000000000000"} /></label>
               <div className="settings-card">
@@ -164,6 +167,7 @@ export function SettingsDialog({ open, onClose, onSettingsSaved }: { open: boole
                   <button className="primary-button" onClick={() => void connectAccount()} disabled={oauthBusy || !settings[oauthProvider.clientIdKey].trim()}>{oauthBusy ? "Aguardando login…" : "Conectar conta"}</button>
                 </div>
               </div>
+            </> : null}
             </>}
             <h3 className="settings-section-gap">Credenciais (ficam só no chaveiro do sistema)</h3>
             <p className="settings-note">{(usingNextcloud ? credentialsConfigured : true) ? "Frase de criptografia já configurada nesta máquina." : "Ainda não configuradas nesta máquina."} A frase de criptografia é diferente de qualquer senha — ela nunca é enviada a lugar nenhum, só usada aqui para cifrar/decifrar. Deixe os campos em branco se só quiser atualizar a configuração sem trocar as credenciais já salvas.</p>
