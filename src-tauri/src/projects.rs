@@ -183,8 +183,11 @@ impl ProjectRepository {
         ensure_column(&connection, "app_settings", "google_client_id", "TEXT NOT NULL DEFAULT ''")?;
         ensure_column(&connection, "app_settings", "onedrive_client_id", "TEXT NOT NULL DEFAULT ''")?;
         ensure_column(&connection, "app_settings", "cloud_account", "TEXT NOT NULL DEFAULT ''")?;
-        // Migração de nomes legados (Nextcloud removido em 2026-11-11): copia
-        // o valor das colunas antigas quando existem; nunca apaga nada.
+        // Migração de nomes legados (Nextcloud removido em 2026-11-11).
+        // Idempotente e numa única passada: só herda o toggle legado quando o
+        // provedor ainda é o removido (estado legado); depois garante o
+        // invariante "sincronização exige provedor válido" — roda em todo
+        // lançamento e se autocorrige sem apagar nada além do inválido.
         if table_has_column(&connection, "projects", "nextcloud_sync_id")? {
             connection.execute_batch(
                 "UPDATE projects SET cloud_sync_id = nextcloud_sync_id WHERE cloud_sync_id IS NULL",
@@ -192,14 +195,12 @@ impl ProjectRepository {
         }
         if table_has_column(&connection, "app_settings", "nextcloud_sync_enabled")? {
             connection.execute_batch(
-                "UPDATE app_settings SET cloud_sync_enabled = nextcloud_sync_enabled",
+                "UPDATE app_settings SET cloud_sync_enabled = nextcloud_sync_enabled
+                 WHERE cloud_provider NOT IN ('', 'google', 'onedrive')",
             )?;
         }
-        // Provedor removido (Nextcloud, decisão 008): sem provedor válido não
-        // existe sync — desliga e limpa a escolha em vez de tentar sincronizar
-        // contra um provedor que o app não tem mais. O resto da config fica.
         connection.execute_batch(
-            "UPDATE app_settings SET cloud_sync_enabled = 0 WHERE cloud_provider NOT IN ('', 'google', 'onedrive')",
+            "UPDATE app_settings SET cloud_sync_enabled = 0 WHERE cloud_provider NOT IN ('google', 'onedrive')",
         )?;
         connection.execute_batch(
             "UPDATE app_settings SET cloud_provider = '' WHERE cloud_provider NOT IN ('', 'google', 'onedrive')",
@@ -1057,6 +1058,41 @@ mod tests {
         let project = add(&repository, &project_dir.path().join("workspace")).unwrap();
         repository.mark_project_synced(&project.id, "sync-id-123", 42).unwrap();
         assert_eq!(repository.project_by_id(&project.id).unwrap().cloud_sync_id.as_deref(), Some("sync-id-123"));
+    }
+
+    #[test]
+    fn migration_never_leaves_sync_enabled_without_a_valid_provider() {
+        let (_directory, repository) = repository();
+        // Caso 1: estado legado completo — provedor removido + toggle ligado
+        // na coluna antiga. initialize() tem de herdar o toggle e logo
+        // desligar, porque não existe provedor válido.
+        {
+            let connection = repository.open().unwrap();
+            connection
+                .execute_batch(
+                    "ALTER TABLE app_settings ADD COLUMN nextcloud_sync_enabled INTEGER NOT NULL DEFAULT 0;
+                     UPDATE app_settings SET cloud_provider = 'nextcloud';
+                     UPDATE app_settings SET nextcloud_sync_enabled = 1",
+                )
+                .unwrap();
+        }
+        repository.initialize().unwrap();
+        let migrated = read_app_settings(&repository).unwrap();
+        assert_eq!(migrated.cloud_provider, "");
+        assert!(!migrated.cloud_sync_enabled, "sync não pode ficar ligado sem provedor válido");
+
+        // Caso 2: estado intermediário ruim (builds 2026-11-11 anteriores ao
+        // invariante) — provider já limpo mas sync religado pelo backfill a
+        // cada lançamento. initialize() se autocorrige.
+        {
+            let connection = repository.open().unwrap();
+            connection
+                .execute_batch("UPDATE app_settings SET cloud_sync_enabled = 1")
+                .unwrap();
+        }
+        repository.initialize().unwrap();
+        let healed = read_app_settings(&repository).unwrap();
+        assert!(!healed.cloud_sync_enabled);
     }
 
     #[test]
