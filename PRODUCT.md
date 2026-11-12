@@ -12,7 +12,7 @@ Desenvolvedores em geral que baixam o app público no GitHub (github.com/raulgre
 
 ## Product Purpose
 
-Aplicativo desktop local-first (macOS/Windows, Tauri) que organiza **qualquer** CLI de IA em projetos com terminais PTY reais, mantém histórico/memória/contexto universais independentes dos fornecedores e sincroniza tudo (histórico, contexto e arquivos de projeto) pela **conta cloud do próprio usuário** — Google Drive, OneDrive ou Nextcloud — para que, ao abrir o app em outra máquina com a mesma conta e sincronizar, a pessoa recupere histórico, contexto e arquivos e continue de onde parou. Sucesso = trocar de máquina e estar exatamente onde estava, sem fricção e sem backend do HostDrive.
+Aplicativo desktop local-first (macOS/Windows, Tauri) que organiza **qualquer** CLI de IA em projetos com terminais PTY reais, mantém histórico/memória/contexto universais independentes dos fornecedores e sincroniza tudo (histórico, contexto e arquivos de projeto) pela **conta cloud do próprio usuário** — Google Drive ou OneDrive — para que, ao abrir o app em outra máquina com a mesma conta e sincronizar, a pessoa recupere histórico, contexto e arquivos e continue de onde parou. Sucesso = trocar de máquina e estar exatamente onde estava, sem fricção e sem backend do HostDrive.
 
 ## Positioning
 
@@ -29,12 +29,12 @@ A camada de contexto é do usuário, não do fornecedor: histórico, memória e 
 
 ## Capabilities and Constraints
 
-Confirmado (funciona hoje): detecção das 4 CLIs, até 6 terminais PTY, projetos com busca/favoritos/arquivo, histórico SQLite FTS5 com exportação, memória e tarefas com proveniência, pacotes UAHP de handoff, sync Nextcloud (memória/tarefas/UAHP/preferências, cifrado no cliente), atualização automática por GitHub Releases, temas, atalhos, acessibilidade básica.
+Confirmado (funciona hoje): detecção das 4 CLIs, até 6 terminais PTY, projetos com busca/favoritos/arquivo, histórico SQLite FTS5 com exportação, memória e tarefas com proveniência, pacotes UAHP de handoff, sync Google Drive/OneDrive (memória/tarefas/UAHP/preferências, cifrado no cliente), atualização automática por GitHub Releases, temas, atalhos, acessibilidade básica.
 
 Pedido nesta rodada (2026-11-10), tudo confirmado pelo usuário:
 - **Agentes dinâmicos**: suporte a todas as CLIs, sem lista fixa; um agente aparece quando conectado/iniciado, os não conectados não aparecem.
 - **Contexto universal entre conversas**: o contexto precisa necessariamente fluir de uma conversa para outra dentro de um projeto.
-- **Sync multi-provedor**: Google Drive, OneDrive e Nextcloud (usuário fornece Client IDs OAuth próprios; guia de registro embutido). Sync cobre histórico, contexto e arquivos de projeto.
+- **Sync multi-provedor**: Google Drive e OneDrive (usuário fornece Client IDs OAuth próprios; guia de registro embutido). Sync cobre histórico, contexto e arquivos de projeto.
 - **UI/UX simples e objetiva, visual de alto nível.**
 
 Restrições duras (do AGENTS.md, inegociáveis): tudo no computador do usuário; sem servidor próprio, conta HostDrive ou sync obrigatório; sem guardar senhas/tokens fora do chaveiro do SO; sem operações Git destrutivas; nunca marcar como testado o que não foi executado (em plataforma inacessível, registrar NOT_VERIFIED); execução perigosa só com confirmação.

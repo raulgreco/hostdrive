@@ -4,13 +4,11 @@ export type AppSettings = {
   captureTerminalEvents: boolean;
   retentionDays: number;
   theme: ThemePreference;
-  /** Endereço do servidor Nextcloud (ex.: https://nuvem.exemplo.com) — não é segredo. */
-  nextcloudUrl: string;
-  nextcloudUsername: string;
-  nextcloudSyncEnabled: boolean;
+  /** Sincronização cloud ativa para o provedor escolhido (opt-in). */
+  cloudSyncEnabled: boolean;
   /** Contexto universal entre conversas: arquivo no projeto + injeção validada. */
   contextCarryoverEnabled: boolean;
-  /** Provedor de nuvem: "nextcloud" | "google" | "onedrive". */
+  /** Provedor de nuvem: "" (nenhum) | "google" | "onedrive". */
   cloudProvider: string;
   /** Client IDs OAuth (não secretos) — tokens ficam só no chaveiro. */
   googleClientId: string;

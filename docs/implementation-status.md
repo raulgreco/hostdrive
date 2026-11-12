@@ -39,6 +39,15 @@ rotulado "Novo projeto". Controles de janela desenhados pelo app
 (`WindowControls`) ficam dormentes — só renderizam se a janela estiver sem
 decoração nativa.
 
+**2026-11-11 — Nextcloud REMOVIDO (decisão do usuário, ver
+`docs/decisions/008-cloud-providers-google-onedrive.md`)**: nuvem = Google
+Drive ou OneDrive, login só via OAuth. `NextcloudConfig`, `Remote::Nextcloud`
+e os comandos de credenciais Nextcloud foram removidos; frase de
+criptografia agora via `set_cloud_passphrase`. Banco migra
+`nextcloud_sync_enabled`→`cloud_sync_enabled` e
+`nextcloud_sync_id`→`cloud_sync_id` (cópia, nunca apaga). Sem provedor, o app
+não toca o chaveiro — fim dos ~15 prompts de permissão e dos erros de boot.
+
 **2026-11-11 — padrão macOS de fechamento + silêncio no boot + chaveiro**:
 
 - Fechar (×) agora **esconde** a janela e o app continua na Dock — padrão

@@ -15,21 +15,10 @@ export type CloudStatus = {
   hasPassphrase: boolean;
 };
 
-/** `true` só quando a senha de app e a frase de criptografia já estão no chaveiro do sistema. Nunca devolve os valores. */
-export async function hasNextcloudCredentials() {
+/** Salva a frase de criptografia no chaveiro do sistema — nunca no SQLite, nunca lida de volta pela UI. */
+export async function setCloudPassphrase(passphrase: string) {
   const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<boolean>("has_nextcloud_credentials");
-}
-
-/** Grava no chaveiro do sistema operacional — nunca no SQLite, nunca lido de volta pela UI. */
-export async function setNextcloudCredentials(appPassword: string, passphrase: string) {
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<void>("set_nextcloud_credentials", { appPassword, passphrase });
-}
-
-export async function clearNextcloudCredentials() {
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<void>("clear_nextcloud_credentials");
+  return invoke<void>("set_cloud_passphrase", { passphrase });
 }
 
 export async function getCloudStatus() {
@@ -37,7 +26,7 @@ export async function getCloudStatus() {
   return invoke<CloudStatus>("get_cloud_status");
 }
 
-/** Abre o navegador, espera o login OAuth e retorna o e-mail da conta conectada. */
+/** Abre o navegador, espera o login OAuth (Google Drive ou OneDrive) e retorna o e-mail da conta conectada. */
 export async function connectCloud() {
   const { invoke } = await import("@tauri-apps/api/core");
   return invoke<string>("connect_cloud");

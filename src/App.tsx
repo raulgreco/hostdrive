@@ -75,7 +75,7 @@ export function App() {
 
   const applyCloudSettings = useCallback((settings: AppSettings) => {
     setTheme(settings.theme);
-    setCloudSyncEnabled(settings.nextcloudSyncEnabled);
+    setCloudSyncEnabled(settings.cloudSyncEnabled);
   }, []);
 
   useEffect(() => {
@@ -316,7 +316,7 @@ function Onboarding({ onAddProject }: { onAddProject(): void }) {
       <ol className="onboarding-steps">
         <li><strong>Abra um projeto</strong><span>Aponte a pasta do seu trabalho — o histórico, a memória e o contexto passam a ficar ligados a ela.</span></li>
         <li><strong>Conecte um agente</strong><span>No terminal, escolha Codex, Claude, Kimi ou qualquer outra CLI instalada e inicie a sessão — é um PTY real, com o contexto do projeto já carregado.</span></li>
-        <li><strong>Continue de qualquer lugar</strong><span>Em Configurações → Nuvem, conecte seu Google Drive, OneDrive ou Nextcloud. Mesma conta em outro computador = mesmo trabalho.</span></li>
+        <li><strong>Continue de qualquer lugar</strong><span>Em Configurações → Nuvem, conecte seu Google Drive ou OneDrive. Mesma conta em outro computador = mesmo trabalho.</span></li>
       </ol>
       <button className="primary-button" onClick={onAddProject}>Abrir meu primeiro projeto</button>
     </div>

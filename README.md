@@ -18,13 +18,13 @@ Aplicativo desktop local-first para organizar **qualquer CLI de IA** (Codex, Cla
 - Retomada de sessão nativa quando o agente expõe o comando (`codex resume --last`, `--continue` em Claude/OpenCode/Kimi) — sempre validada no binário instalado, nunca presumida.
 - Comando do orquestrador `///agente <id>` / `///retomar` / `///ajuda` com paleta de sugestões, sem nunca interferir no stream do terminal.
 - Atalhos: `Cmd/Ctrl+K` (comando do orquestrador), `Cmd/Ctrl+N` (novo terminal), `Cmd/Ctrl+,` (Configurações), `Esc` (fechar diálogo).
-- **Sincronização via sua própria nuvem** — Google Drive, OneDrive ou Nextcloud (um provedor ativo por vez, escolhido em Configurações → Nuvem):
+- **Sincronização via sua própria nuvem** — Google Drive ou OneDrive (um provedor ativo por vez, escolhido em Configurações → Nuvem):
   - A conta que você já tem é a identidade: mesmo e-mail em outra máquina = mesmo trabalho. Sem conta Eureka42, sem servidor nosso.
-  - OAuth com PKCE para Google/OneDrive (Client ID gerado por você, guia embutido nas Configurações); tokens só no chaveiro do sistema.
+  - Login só por OAuth (PKCE) no Google ou na Microsoft (Client ID gerado por você, guia embutido nas Configurações); tokens só no chaveiro do sistema.
   - Tudo cifrado no cliente antes de sair da máquina (AES-256-GCM + Argon2) — nem o provedor vê o conteúdo.
   - Sincroniza memória, tarefas, contexto, pacotes UAHP, preferências e agentes personalizados.
   - **Arquivos do projeto** espelhados com opt-in por projeto (exceto `.git`, dependências, arquivos de segredo e > 4 MiB); `.eureka42/contexto.md` viaja junto. Nunca apaga arquivos; conflitos sempre perguntam.
-  - Histórico de terminal é opt-in por projeto (pode conter segredos). Ver `docs/decisions/005-nextcloud-sync.md` e `docs/decisions/007-multi-cloud-sync.md`.
+  - Histórico de terminal é opt-in por projeto (pode conter segredos). Ver `docs/decisions/007-multi-cloud-sync.md` e `docs/decisions/008-cloud-providers-google-onedrive.md`.
 - Funcionamento sem conta própria; tudo funciona offline — a nuvem é espelho opcional.
 
 ## Privacidade
@@ -86,9 +86,9 @@ O instalador (`Eureka42_0.1.0_x64-setup.exe`) foi configurado para ser amigável
 
 Os binários são PE32+ válidos e o instalador é um NSIS PE32 GUI válido (tudo verificado neste Mac), mas a execução real em Windows (abrir janela, WebView2, PTY/ConPTY com as quatro CLIs) permanece `NOT_VERIFIED` — não há host ou VM Windows disponível para testar aqui. Assinatura de código e instalador MSI (WiX) também não estão disponíveis neste host; só NSIS.
 
-## Sincronização via Nextcloud
+## Sincronização via Google Drive ou OneDrive
 
-Em Configurações → Nextcloud: informe o endereço do servidor, o usuário, uma **senha de app** (gerada em Configurações → Segurança no próprio Nextcloud, nunca a senha principal da conta) e uma **frase de criptografia** própria (cifra os dados antes de saírem da máquina — nem o Nextcloud vê o conteúdo). As duas credenciais ficam só no chaveiro do sistema operacional. Com a sincronização ativada, abrir ou trocar de projeto traz o que há de mais novo; fechar a janela ou trocar de projeto envia o que mudou. Em caso de mudanças nas duas pontas ao mesmo tempo, o app pergunta qual versão manter — nunca decide sozinho. Histórico de terminal fica de fora por padrão; ative por projeto se quiser incluí-lo. Detalhes completos e o que fica **de fora** da sincronização em `docs/decisions/005-nextcloud-sync.md`.
+Em Configurações → Nuvem: escolha o provedor, informe um **Client ID** OAuth gerado por você (o guia de registro está embutido na tela) e clique **Conectar conta** — o login abre no navegador e os tokens ficam só no chaveiro do sistema. Defina também uma **frase de criptografia** (cifra os dados antes de saírem da máquina — nem o provedor vê o conteúdo); ela fica só no chaveiro. Com a sincronização ativada, abrir ou trocar de projeto traz o que há de mais novo; trocar de projeto envia o que mudou. Em caso de mudanças nas duas pontas ao mesmo tempo, o app pergunta qual versão manter — nunca decide sozinho. Histórico de terminal fica de fora por padrão; ative por projeto se quiser incluí-lo. Detalhes em `docs/decisions/007-multi-cloud-sync.md` e `docs/decisions/008-cloud-providers-google-onedrive.md`.
 
 ## Atualização automática
 
@@ -103,4 +103,4 @@ O app consulta `https://github.com/raulgreco/hostdrive/releases/latest/download/
 
 A chave privada de assinatura vive em `~/.hostdrive-keys/hostdrive-updater.key` (fora do repositório) e como secret `TAURI_SIGNING_PRIVATE_KEY` no GitHub — **faça backup desse arquivo**; perdê-lo significa não poder mais assinar atualizações para quem já instalou o app.
 
-Consulte `docs/implementation-status.md` para evidências e limitações verificadas, `docs/decisions/003-resume-palette-theme.md` para as decisões de retomada de sessão/paleta/tema, `docs/decisions/004-windows-executable-detection-fix.md` para a correção de detecção de agentes no Windows, `docs/decisions/005-nextcloud-sync.md` para a sincronização, e `docs/decisions/006-auto-update.md` para a atualização automática.
+Consulte `docs/implementation-status.md` para evidências e limitações verificadas, `docs/decisions/003-resume-palette-theme.md` para as decisões de retomada de sessão/paleta/tema, `docs/decisions/004-windows-executable-detection-fix.md` para a correção de detecção de agentes no Windows, `docs/decisions/007-multi-cloud-sync.md` para a sincronização via Google Drive/OneDrive e `docs/decisions/008-cloud-providers-google-onedrive.md` para a remoção do Nextcloud, e `docs/decisions/006-auto-update.md` para a atualização automática.

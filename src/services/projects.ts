@@ -6,7 +6,7 @@ export type Project = {
   isArchived: boolean;
   createdAt: number;
   lastOpenedAt: number;
-  nextcloudSyncId: string | null;
+  cloudSyncId: string | null;
   lastSyncedAt: number;
   /** Opt-in por projeto — nunca ligado por padrão (pode conter segredos colados no terminal). */
   syncTerminalHistory: boolean;

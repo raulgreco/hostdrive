@@ -22,10 +22,10 @@ pub struct Project {
     is_archived: bool,
     created_at: i64,
     last_opened_at: i64,
-    /// Identificador estável usado como nome do objeto remoto no Nextcloud —
-    /// independente do caminho local, que muda de máquina para máquina.
-    /// `None` até a primeira sincronização.
-    pub(crate) nextcloud_sync_id: Option<String>,
+    /// Identificador estável usado como nome do objeto remoto na nuvem do
+    /// usuário — independente do caminho local, que muda de máquina para
+    /// máquina. `None` até a primeira sincronização.
+    pub(crate) cloud_sync_id: Option<String>,
     pub(crate) last_synced_at: i64,
     /// Opt-in explícito por projeto — nunca ligado por padrão (ver
     /// docs/decisions/005-nextcloud-sync.md): histórico de terminal pode
@@ -82,13 +82,10 @@ pub struct AppSettings {    pub(crate) capture_terminal_events: bool,
     /// NFR-006 — preferência de tema: "system" segue o SO, ou "light"/"dark"
     /// força a escolha manual.
     pub(crate) theme: String,
-    /// Configuração de sincronização opcional via Nextcloud — ver
-    /// docs/decisions/005-nextcloud-sync.md. `nextcloud_url`/`username` não
-    /// são segredo e vivem aqui; a senha de app e a frase de criptografia
-    /// ficam só no chaveiro do sistema operacional (nunca no SQLite).
-    pub(crate) nextcloud_url: String,
-    pub(crate) nextcloud_username: String,
-    pub(crate) nextcloud_sync_enabled: bool,
+    /// Sincronização opcional via nuvem do próprio usuário (Google Drive ou
+    /// OneDrive, OAuth). Login só por eles (decisão do usuário, 2026-11-11 —
+    /// ver docs/decisions/008-cloud-providers-google-onedrive.md).
+    pub(crate) cloud_sync_enabled: bool,
     /// Contexto universal entre conversas (2026-11-10): quando ligado, o
     /// HostDrive mantém `.eureka42/contexto.md` no diretório do projeto
     /// atualizado e injeta o contexto em novas sessões dos agentes com flag
@@ -96,9 +93,9 @@ pub struct AppSettings {    pub(crate) capture_terminal_events: bool,
     /// promessa de continuidade; usuário pode desligar na Configurações.
     pub(crate) context_carryover_enabled: bool,
     /// Provedor de nuvem escolhido (2026-11-10): "" (nenhum — padrão) |
-    /// "nextcloud" | "google" | "onedrive". `nextcloud_sync_enabled` passa a
-    /// significar "sincronização cloud ativa" para o provedor escolhido.
-    /// Sem padrão implícito: a escolha é sempre do usuário (2026-11-11).
+    /// "google" | "onedrive". `cloud_sync_enabled` significa "sincronização
+    /// cloud ativa" para o provedor escolhido. Sem padrão implícito: a
+    /// escolha é sempre do usuário (2026-11-11).
     pub(crate) cloud_provider: String,
     /// Client IDs OAuth do usuário (Google Drive / OneDrive) — não são
     /// segredo; vivem aqui. Tokens ficam só no chaveiro.
@@ -126,7 +123,7 @@ impl ProjectRepository {
                is_archived INTEGER NOT NULL DEFAULT 0,
                created_at INTEGER NOT NULL,
                last_opened_at INTEGER NOT NULL,
-               nextcloud_sync_id TEXT,
+               cloud_sync_id TEXT,
                last_synced_at INTEGER NOT NULL DEFAULT 0,
                sync_terminal_history INTEGER NOT NULL DEFAULT 0
              );
@@ -167,9 +164,7 @@ impl ProjectRepository {
                capture_terminal_events INTEGER NOT NULL DEFAULT 1,
                retention_days INTEGER NOT NULL DEFAULT 90,
                theme TEXT NOT NULL DEFAULT 'dark',
-               nextcloud_url TEXT NOT NULL DEFAULT '',
-               nextcloud_username TEXT NOT NULL DEFAULT '',
-               nextcloud_sync_enabled INTEGER NOT NULL DEFAULT 0
+               cloud_sync_enabled INTEGER NOT NULL DEFAULT 0
              );
              INSERT OR IGNORE INTO app_settings(id) VALUES(1);",
         )?;        // Migração para bancos criados antes destas colunas existirem.
@@ -177,10 +172,8 @@ impl ProjectRepository {
         // "duplicate column name" quando a coluna já existe.
         ensure_column(&connection, "terminal_sessions", "resumed", "INTEGER NOT NULL DEFAULT 0")?;
         ensure_column(&connection, "app_settings", "theme", "TEXT NOT NULL DEFAULT 'dark'")?;
-        ensure_column(&connection, "app_settings", "nextcloud_url", "TEXT NOT NULL DEFAULT ''")?;
-        ensure_column(&connection, "app_settings", "nextcloud_username", "TEXT NOT NULL DEFAULT ''")?;
-        ensure_column(&connection, "app_settings", "nextcloud_sync_enabled", "INTEGER NOT NULL DEFAULT 0")?;
-        ensure_column(&connection, "projects", "nextcloud_sync_id", "TEXT")?;
+        ensure_column(&connection, "app_settings", "cloud_sync_enabled", "INTEGER NOT NULL DEFAULT 0")?;
+        ensure_column(&connection, "projects", "cloud_sync_id", "TEXT")?;
         ensure_column(&connection, "projects", "last_synced_at", "INTEGER NOT NULL DEFAULT 0")?;
         ensure_column(&connection, "projects", "sync_terminal_history", "INTEGER NOT NULL DEFAULT 0")?;
         ensure_column(&connection, "projects", "files_sync_enabled", "INTEGER NOT NULL DEFAULT 0")?;
@@ -190,6 +183,18 @@ impl ProjectRepository {
         ensure_column(&connection, "app_settings", "google_client_id", "TEXT NOT NULL DEFAULT ''")?;
         ensure_column(&connection, "app_settings", "onedrive_client_id", "TEXT NOT NULL DEFAULT ''")?;
         ensure_column(&connection, "app_settings", "cloud_account", "TEXT NOT NULL DEFAULT ''")?;
+        // Migração de nomes legados (Nextcloud removido em 2026-11-11): copia
+        // o valor das colunas antigas quando existem; nunca apaga nada.
+        if table_has_column(&connection, "projects", "nextcloud_sync_id")? {
+            connection.execute_batch(
+                "UPDATE projects SET cloud_sync_id = nextcloud_sync_id WHERE cloud_sync_id IS NULL",
+            )?;
+        }
+        if table_has_column(&connection, "app_settings", "nextcloud_sync_enabled")? {
+            connection.execute_batch(
+                "UPDATE app_settings SET cloud_sync_enabled = nextcloud_sync_enabled",
+            )?;
+        }
         connection.execute_batch(
             "CREATE TABLE IF NOT EXISTS project_memory (
                project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -289,7 +294,7 @@ impl ProjectRepository {
     }
 
     /// Carrega o registro completo do projeto — usado pela sincronização
-    /// (`sync.rs`) para ler nome, `nextcloud_sync_id` e `last_synced_at`.
+    /// (`sync.rs`) para ler nome, `cloud_sync_id` e `last_synced_at`.
     pub(crate) fn project_by_id(&self, project_id: &str) -> Result<Project, rusqlite::Error> {
         self.open()?.query_row(
             &format!("SELECT {PROJECT_COLUMNS} FROM projects WHERE id=?1"),
@@ -303,12 +308,12 @@ impl ProjectRepository {
     pub(crate) fn mark_project_synced(
         &self,
         project_id: &str,
-        nextcloud_sync_id: &str,
+        cloud_sync_id: &str,
         synced_at: i64,
     ) -> Result<(), rusqlite::Error> {
         self.open()?.execute(
-            "UPDATE projects SET nextcloud_sync_id=?1,last_synced_at=?2 WHERE id=?3",
-            params![nextcloud_sync_id, synced_at, project_id],
+            "UPDATE projects SET cloud_sync_id=?1,last_synced_at=?2 WHERE id=?3",
+            params![cloud_sync_id, synced_at, project_id],
         )?;
         Ok(())
     }
@@ -533,6 +538,20 @@ fn ensure_column(
     }
 }
 
+/// `true` quando a coluna existe no esquema da tabela — usado nas migrações
+/// de renomeação (2026-11-11) para copiar de colunas legadas sem assumir que
+/// elas existem em bancos novos.
+fn table_has_column(
+    connection: &Connection,
+    table: &str,
+    column: &str,
+) -> Result<bool, rusqlite::Error> {
+    let mut statement =
+        connection.prepare("SELECT COUNT(*) FROM pragma_table_info(?1) WHERE name=?2")?;
+    let count: i64 = statement.query_row(params![table, column], |row| row.get(0))?;
+    Ok(count > 0)
+}
+
 #[tauri::command]
 pub fn list_projects(
     repository: State<'_, ProjectRepository>,
@@ -625,9 +644,7 @@ pub fn update_app_settings(
     capture_terminal_events: bool,
     retention_days: i64,
     theme: String,
-    nextcloud_url: String,
-    nextcloud_username: String,
-    nextcloud_sync_enabled: bool,
+    cloud_sync_enabled: bool,
     context_carryover_enabled: bool,
     cloud_provider: String,
     google_client_id: String,
@@ -639,9 +656,7 @@ pub fn update_app_settings(
         capture_terminal_events,
         retention_days,
         theme,
-        nextcloud_url,
-        nextcloud_username,
-        nextcloud_sync_enabled,
+        cloud_sync_enabled,
         context_carryover_enabled,
         cloud_provider,
         google_client_id,
@@ -748,28 +763,27 @@ fn fts_query(input: &str) -> String {
 
 pub(crate) fn read_app_settings(repository: &ProjectRepository) -> Result<AppSettings, rusqlite::Error> {
     repository.open()?.query_row(
-        "SELECT capture_terminal_events,retention_days,theme,nextcloud_url,nextcloud_username,nextcloud_sync_enabled,context_carryover_enabled,cloud_provider,google_client_id,onedrive_client_id,cloud_account FROM app_settings WHERE id=1",
+        "SELECT capture_terminal_events,retention_days,theme,cloud_sync_enabled,context_carryover_enabled,cloud_provider,google_client_id,onedrive_client_id,cloud_account FROM app_settings WHERE id=1",
         [],
         |row| {
             Ok(AppSettings {
                 capture_terminal_events: row.get(0)?,
                 retention_days: row.get(1)?,
                 theme: row.get(2)?,
-                nextcloud_url: row.get(3)?,
-                nextcloud_username: row.get(4)?,
-                nextcloud_sync_enabled: row.get(5)?,
-                context_carryover_enabled: row.get(6)?,
-                cloud_provider: row.get(7)?,
-                google_client_id: row.get(8)?,
-                onedrive_client_id: row.get(9)?,
-                cloud_account: row.get(10)?,
+                cloud_sync_enabled: row.get(3)?,
+                context_carryover_enabled: row.get(4)?,
+                cloud_provider: row.get(5)?,
+                google_client_id: row.get(6)?,
+                onedrive_client_id: row.get(7)?,
+                cloud_account: row.get(8)?,
             })
         },
     )
 }
 
 const VALID_THEMES: [&str; 3] = ["system", "light", "dark"];
-const VALID_CLOUD_PROVIDERS: [&str; 3] = ["nextcloud", "google", "onedrive"];
+/// "" (nenhum) é valor válido — a nuvem é opt-in, sem padrão (2026-11-11).
+const VALID_CLOUD_PROVIDERS: [&str; 3] = ["", "google", "onedrive"];
 
 #[allow(clippy::too_many_arguments)]
 fn write_app_settings(
@@ -777,9 +791,7 @@ fn write_app_settings(
     capture_terminal_events: bool,
     retention_days: i64,
     theme: String,
-    nextcloud_url: String,
-    nextcloud_username: String,
-    nextcloud_sync_enabled: bool,
+    cloud_sync_enabled: bool,
     context_carryover_enabled: bool,
     cloud_provider: String,
     google_client_id: String,
@@ -793,14 +805,14 @@ fn write_app_settings(
         return Err("tema inválido: use system, light ou dark".into());
     }
     if !VALID_CLOUD_PROVIDERS.contains(&cloud_provider.as_str()) {
-        return Err("provedor de nuvem inválido: use nextcloud, google ou onedrive".into());
+        return Err("provedor de nuvem inválido: use \"google\", \"onedrive\" ou vazio para nenhum".into());
     }
-    if nextcloud_sync_enabled && (nextcloud_url.trim().is_empty() || nextcloud_username.trim().is_empty()) {
-        return Err("informe o endereço do servidor e o usuário do Nextcloud antes de ativar a sincronização".into());
+    if cloud_sync_enabled && cloud_provider.is_empty() {
+        return Err("escolha o provedor de nuvem (Google Drive ou OneDrive) antes de ativar a sincronização".into());
     }
     repository.open()?.execute(
-        "UPDATE app_settings SET capture_terminal_events=?1,retention_days=?2,theme=?3,nextcloud_url=?4,nextcloud_username=?5,nextcloud_sync_enabled=?6,context_carryover_enabled=?7,cloud_provider=?8,google_client_id=?9,onedrive_client_id=?10,cloud_account=?11 WHERE id=1",
-        params![capture_terminal_events, retention_days, theme, nextcloud_url.trim(), nextcloud_username.trim(), nextcloud_sync_enabled, context_carryover_enabled, cloud_provider, google_client_id.trim(), onedrive_client_id.trim(), cloud_account.trim()],
+        "UPDATE app_settings SET capture_terminal_events=?1,retention_days=?2,theme=?3,cloud_sync_enabled=?4,context_carryover_enabled=?5,cloud_provider=?6,google_client_id=?7,onedrive_client_id=?8,cloud_account=?9 WHERE id=1",
+        params![capture_terminal_events, retention_days, theme, cloud_sync_enabled, context_carryover_enabled, cloud_provider, google_client_id.trim(), onedrive_client_id.trim(), cloud_account.trim()],
     )?;
     Ok(read_app_settings(repository)?)
 }
@@ -857,7 +869,7 @@ fn update_flag(
     Ok(())
 }
 
-const PROJECT_COLUMNS: &str = "id,name,path,is_favorite,is_archived,created_at,last_opened_at,nextcloud_sync_id,last_synced_at,sync_terminal_history,files_sync_enabled,files_last_sync_at";
+const PROJECT_COLUMNS: &str = "id,name,path,is_favorite,is_archived,created_at,last_opened_at,cloud_sync_id,last_synced_at,sync_terminal_history,files_sync_enabled,files_last_sync_at";
 
 fn project_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Project> {
     Ok(Project {
@@ -868,7 +880,7 @@ fn project_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Project> {
         is_archived: row.get(4)?,
         created_at: row.get(5)?,
         last_opened_at: row.get(6)?,
-        nextcloud_sync_id: row.get(7)?,
+        cloud_sync_id: row.get(7)?,
         last_synced_at: row.get(8)?,
         sync_terminal_history: row.get(9)?,
         files_sync_enabled: row.get(10)?,
@@ -979,7 +991,7 @@ mod tests {
         let initial = read_app_settings(&repository).unwrap();
         assert!(initial.capture_terminal_events);
         assert_eq!(initial.theme, "dark");
-        assert!(!initial.nextcloud_sync_enabled);
+        assert!(!initial.cloud_sync_enabled);
         // Contexto entre conversas vem ligado por padrão (promessa central
         // do produto); usuário pode desligar explicitamente.
         assert!(initial.context_carryover_enabled);
@@ -988,11 +1000,9 @@ mod tests {
             false,
             30,
             "light".into(),
-            String::new(),
-            String::new(),
             false,
             false,
-            "nextcloud".into(),
+            String::new(),
             String::new(),
             String::new(),
             String::new(),
@@ -1003,18 +1013,16 @@ mod tests {
         assert_eq!(changed.theme, "light");
         assert!(!changed.context_carryover_enabled);
         assert!(!repository.should_capture_terminal_events().unwrap());
-        assert!(write_app_settings(&repository, true, 0, "light".into(), String::new(), String::new(), false, true, "nextcloud".into(), String::new(), String::new(), String::new()).is_err());
-        assert!(write_app_settings(&repository, true, 30, "neon".into(), String::new(), String::new(), false, true, "nextcloud".into(), String::new(), String::new(), String::new()).is_err());
-        assert!(write_app_settings(&repository, true, 30, "dark".into(), String::new(), String::new(), false, true, "dropbox".into(), String::new(), String::new(), String::new()).is_err());
-        // Não pode ativar a sincronização sem URL/usuário do Nextcloud configurados.
-        assert!(write_app_settings(&repository, true, 30, "dark".into(), String::new(), String::new(), true, true, "nextcloud".into(), String::new(), String::new(), String::new()).is_err());
+        assert!(write_app_settings(&repository, true, 0, "light".into(), false, true, String::new(), String::new(), String::new(), String::new()).is_err());
+        assert!(write_app_settings(&repository, true, 30, "neon".into(), false, true, String::new(), String::new(), String::new(), String::new()).is_err());
+        assert!(write_app_settings(&repository, true, 30, "dark".into(), false, true, "dropbox".into(), String::new(), String::new(), String::new()).is_err());
+        // Não pode ativar a sincronização sem escolher um provedor.
+        assert!(write_app_settings(&repository, true, 30, "dark".into(), true, true, String::new(), String::new(), String::new(), String::new()).is_err());
         let synced = write_app_settings(
             &repository,
             true,
             30,
             "dark".into(),
-            "https://nextcloud.example.com".into(),
-            "raul".into(),
             true,
             true,
             "google".into(),
@@ -1023,10 +1031,23 @@ mod tests {
             "raul@gmail.com".into(),
         )
         .unwrap();
-        assert!(synced.nextcloud_sync_enabled);
-        assert_eq!(synced.nextcloud_url, "https://nextcloud.example.com");
+        assert!(synced.cloud_sync_enabled);
         assert_eq!(synced.cloud_provider, "google");
         assert_eq!(synced.cloud_account, "raul@gmail.com");
+    }
+
+    #[test]
+    fn migrates_legacy_nextcloud_columns_into_cloud_names() {
+        let (_directory, repository) = repository();
+        // Banco novo já nasce com os nomes atuais — nada a migrar e a leitura
+        // funciona direto.
+        let initial = read_app_settings(&repository).unwrap();
+        assert!(!initial.cloud_sync_enabled);
+        let project_dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir(project_dir.path().join("workspace")).unwrap();
+        let project = add(&repository, &project_dir.path().join("workspace")).unwrap();
+        repository.mark_project_synced(&project.id, "sync-id-123", 42).unwrap();
+        assert_eq!(repository.project_by_id(&project.id).unwrap().cloud_sync_id.as_deref(), Some("sync-id-123"));
     }
 
     #[test]

@@ -1,12 +1,13 @@
 //! Sincronização opcional de continuidade via nuvem do próprio usuário.
 //!
-//! Desenho original (Nextcloud/WebDAV) em `docs/decisions/005-nextcloud-sync.md`;
-//! multi-provedor (Google Drive, OneDrive) e sync de arquivos de projeto em
-//! `docs/decisions/007-multi-cloud-sync.md`. Regras que este módulo nunca
+//! Provedores: Google Drive e OneDrive (OAuth, login só por eles — decisão
+//! do usuário em 2026-11-11, ver `docs/decisions/008-cloud-providers-google-onedrive.md`;
+//! Nextcloud removido). Desenho histórico em `docs/decisions/005-nextcloud-sync.md`
+//! e `docs/decisions/007-multi-cloud-sync.md`. Regras que este módulo nunca
 //! quebra (NFR-001/002/003 em `docs/01-REQUISITOS.md`):
-//! - Nenhum servidor próprio: falamos com o Nextcloud/Google Drive/OneDrive
-//!   *da pessoa*, usando a conta que ela já tem. O e-mail da conta é a
-//!   identidade que liga as máquinas — sem cadastro HostDrive.
+//! - Nenhum servidor próprio: falamos com o Google Drive/OneDrive *da pessoa*,
+//!   usando a conta que ela já tem. O e-mail da conta é a identidade que liga
+//!   as máquinas — sem cadastro Eureka42.
 //! - Nenhuma credencial de agente é tocada.
 //! - Senhas e tokens ficam só no chaveiro do sistema operacional — nunca em
 //!   texto puro no SQLite nem devolvidos ao frontend depois de salvos.
@@ -38,11 +39,9 @@ use tauri::State;
 use uuid::Uuid;
 
 const KEYRING_SERVICE: &str = "hostdrive-nextcloud";
-const KEYRING_APP_PASSWORD_USER: &str = "app-password";
 const KEYRING_PASSPHRASE_USER: &str = "encryption-passphrase";
 const KEYRING_GOOGLE_TOKENS: &str = "google-tokens";
 const KEYRING_ONEDRIVE_TOKENS: &str = "onedrive-tokens";
-const REMOTE_FOLDER: &str = "Eureka42";
 const APP_PAYLOAD_NAME: &str = "app.uaisync";
 const SALT_LEN: usize = 16;
 const NONCE_LEN: usize = 12;
@@ -148,32 +147,17 @@ enum Decision {
 
 // ---------------------------------------------------------------- comandos
 
+/// Salva a frase de criptografia (cifra local dos pacotes sincronizados) no
+/// chaveiro do sistema. Nunca enviada a lugar nenhum — só lida de volta no
+/// sync, ainda no chaveiro.
 #[tauri::command]
-pub fn has_nextcloud_credentials() -> Result<bool, String> {
-    Ok(read_secret(KEYRING_APP_PASSWORD_USER)?.is_some()
-        && read_secret(KEYRING_PASSPHRASE_USER)?.is_some())
-}
-
-#[tauri::command]
-pub fn set_nextcloud_credentials(app_password: String, passphrase: String) -> Result<(), String> {
-    if app_password.trim().is_empty() {
-        return Err("informe a senha de app (App Password) do Nextcloud".into());
-    }
+pub fn set_cloud_passphrase(passphrase: String) -> Result<(), String> {
     if passphrase.trim().len() < MIN_PASSPHRASE_LEN {
         return Err(format!(
             "a frase de criptografia deve ter ao menos {MIN_PASSPHRASE_LEN} caracteres"
         ));
     }
-    write_secret(KEYRING_APP_PASSWORD_USER, app_password.trim())?;
-    write_secret(KEYRING_PASSPHRASE_USER, &passphrase)?;
-    Ok(())
-}
-
-#[tauri::command]
-pub fn clear_nextcloud_credentials() -> Result<(), String> {
-    delete_secret(KEYRING_APP_PASSWORD_USER);
-    delete_secret(KEYRING_PASSPHRASE_USER);
-    Ok(())
+    write_secret(KEYRING_PASSPHRASE_USER, &passphrase)
 }
 
 #[tauri::command]
@@ -183,10 +167,6 @@ pub fn get_cloud_status(repository: State<'_, ProjectRepository>) -> Result<Clou
     let (configured, account) = match provider.as_str() {
         "google" => (stored_tokens(OAuthProvider::Google)?.is_some(), settings.cloud_account.clone()),
         "onedrive" => (stored_tokens(OAuthProvider::OneDrive)?.is_some(), settings.cloud_account.clone()),
-        "nextcloud" => (
-            read_secret(KEYRING_APP_PASSWORD_USER)?.is_some(),
-            settings.cloud_account.clone(),
-        ),
         // Sem provedor escolhido: nunca toca o chaveiro — a nuvem é opção
         // explícita do usuário, não padrão (2026-11-11).
         _ => (false, settings.cloud_account.clone()),
@@ -194,7 +174,7 @@ pub fn get_cloud_status(repository: State<'_, ProjectRepository>) -> Result<Clou
     Ok(CloudStatus {
         provider: provider.clone(),
         provider_label: provider_label(&provider).to_string(),
-        sync_enabled: settings.nextcloud_sync_enabled,
+        sync_enabled: settings.cloud_sync_enabled,
         configured,
         account,
         has_passphrase: read_secret(KEYRING_PASSPHRASE_USER)?.is_some(),
@@ -210,7 +190,7 @@ pub async fn connect_cloud(repository: State<'_, ProjectRepository>) -> Result<S
     let (provider, client_id) = match settings.cloud_provider.as_str() {
         "google" => (OAuthProvider::Google, settings.google_client_id.clone()),
         "onedrive" => (OAuthProvider::OneDrive, settings.onedrive_client_id.clone()),
-        other => return Err(format!("provedor \"{other}\" não usa OAuth — configure endereço e senha de app do Nextcloud.")),
+        other => return Err(format!("provedor \"{other}\" não usa OAuth — escolha Google Drive ou OneDrive em Configurações → Nuvem.")),
     };
     let tokens = oauth::authorize(provider, &client_id).await?;
     let account = oauth::account_email(provider, &tokens.access_token).await
@@ -228,7 +208,6 @@ pub fn disconnect_cloud(repository: State<'_, ProjectRepository>) -> Result<(), 
     match settings.cloud_provider.as_str() {
         "google" => delete_secret(KEYRING_GOOGLE_TOKENS),
         "onedrive" => delete_secret(KEYRING_ONEDRIVE_TOKENS),
-        "nextcloud" => return Err("para o Nextcloud, remova as credenciais na seção do Nextcloud.".into()),
         _ => return Err("nenhum provedor de nuvem selecionado.".into()),
     }
     repository
@@ -242,15 +221,9 @@ pub async fn test_cloud_connection(repository: State<'_, ProjectRepository>) -> 
     let mut remote = build_remote(&settings).await?;
     remote.ensure_root().await?;
     Ok(format!(
-        "Conexão confirmada com {} — espaço do HostDrive pronto.",
+        "Conexão confirmada com {} — espaço do Eureka42 pronto.",
         provider_label(&settings.cloud_provider)
     ))
-}
-
-/// Compatibilidade com o frontend anterior à tela unificada de nuvem.
-#[tauri::command]
-pub async fn test_nextcloud_connection(repository: State<'_, ProjectRepository>) -> Result<String, String> {
-    test_cloud_connection(repository).await
 }
 
 #[tauri::command]
@@ -278,7 +251,7 @@ pub(crate) async fn sync_project(
     files_prefer: Option<&str>,
 ) -> Result<SyncOutcome, String> {
     let settings = read_app_settings(repository).map_err(db_error)?;
-    if !settings.nextcloud_sync_enabled {
+    if !settings.cloud_sync_enabled {
         return Ok(SyncOutcome {
             status: "disabled".into(),
             message: format!(
@@ -294,7 +267,7 @@ pub(crate) async fn sync_project(
     remote.ensure_root().await?;
     let project = repository.project_by_id(project_id).map_err(db_error)?;
     let sync_id = project
-        .nextcloud_sync_id
+        .cloud_sync_id
         .clone()
         .unwrap_or_else(|| Uuid::new_v4().to_string());
     let remote_name = format!("{sync_id}.uaisync");
@@ -1090,7 +1063,6 @@ impl OptionalOrFalse for Result<bool, rusqlite::Error> {
 // ------------------------------------------------------------------ remoto
 
 enum Remote {
-    Nextcloud { config: NextcloudConfig, client: reqwest::Client },
     GoogleDrive { access_token: String, client: reqwest::Client, ids: HashMap<String, String> },
     OneDrive { access_token: String, client: reqwest::Client },
 }
@@ -1106,9 +1078,8 @@ async fn build_remote(settings: &AppSettings) -> Result<Remote, String> {
             let tokens = ensure_tokens(OAuthProvider::OneDrive, &settings.onedrive_client_id).await?;
             Ok(Remote::OneDrive { access_token: tokens.access_token, client })
         }
-        "nextcloud" => Ok(Remote::Nextcloud { config: NextcloudConfig::from_settings(settings)?, client }),
         // Sem padrão implícito (2026-11-11): provedor vazio/desconhecido é
-        // erro claro, nunca um fallback silencioso para Nextcloud.
+        // erro claro, nunca um fallback silencioso.
         _ => Err("nenhum provedor de nuvem selecionado — escolha em Configurações → Nuvem.".into()),
     }
 }
@@ -1117,7 +1088,6 @@ fn provider_label(provider: &str) -> &'static str {
     match provider {
         "google" => "Google Drive",
         "onedrive" => "OneDrive",
-        "nextcloud" => "Nextcloud",
         _ => "nenhum provedor",
     }
 }
@@ -1174,57 +1144,13 @@ async fn ensure_tokens(provider: OAuthProvider, client_id: &str) -> Result<oauth
 
 impl Remote {
     async fn ensure_root(&mut self) -> Result<(), String> {
-        match self {
-            Remote::Nextcloud { config, client } => {
-                let response = client
-                    .request(webdav_method("MKCOL"), config.folder_url())
-                    .basic_auth(&config.username, Some(&config.app_password))
-                    .send()
-                    .await
-                    .map_err(|error| format!("falha ao preparar a pasta \"{REMOTE_FOLDER}\": {error}"))?;
-                let status = response.status().as_u16();
-                match status {
-                    200..=299 | 405 => Ok(()),
-                    401 | 403 => Err("Nextcloud recusou a autenticação (usuário ou senha de app incorretos).".into()),
-                    _ => {
-                        // Ecoa o corpo da resposta (XML do SabreDAV costuma
-                        // explicar o motivo) — "HTTP 400" sozinho não é
-                        // acionável para quem está configurando o servidor.
-                        let detail = response.text().await.unwrap_or_default();
-                        let detail: String = detail.chars().filter(|character| !character.is_control()).take(160).collect();
-                        if detail.is_empty() {
-                            Err(format!("falha ao preparar a pasta \"{REMOTE_FOLDER}\" no Nextcloud: HTTP {status}"))
-                        } else {
-                            Err(format!("falha ao preparar a pasta \"{REMOTE_FOLDER}\" no Nextcloud: HTTP {status} — {detail}"))
-                        }
-                    }
-                }
-            }
-            // Google Drive (appDataFolder) e OneDrive (approot) já existem por
-            // definição — nada a criar.
-            _ => Ok(()),
-        }
+        // Google Drive (appDataFolder) e OneDrive (approot) já existem por
+        // definição — nada a criar.
+        Ok(())
     }
 
     async fn download(&mut self, name: &str) -> Result<Option<Vec<u8>>, String> {
         match self {
-            Remote::Nextcloud { config, client } => {
-                let response = client
-                    .get(config.object_url(name))
-                    .basic_auth(&config.username, Some(&config.app_password))
-                    .send()
-                    .await
-                    .map_err(|error| format!("falha ao baixar dados da nuvem: {error}"))?;
-                match response.status().as_u16() {
-                    200..=299 => {
-                        let bytes = response.bytes().await.map_err(|error| format!("falha ao ler resposta: {error}"))?;
-                        Ok(Some(bytes.to_vec()))
-                    }
-                    404 => Ok(None),
-                    401 | 403 => Err("Nextcloud recusou a autenticação (usuário ou senha de app incorretos).".into()),
-                    status => Err(format!("falha ao baixar dados da nuvem: HTTP {status}")),
-                }
-            }
             Remote::GoogleDrive { access_token, client, ids } => {
                 google_resolve_ids(client, access_token, ids).await?;
                 let Some(id) = ids.get(name) else { return Ok(None) };
@@ -1267,21 +1193,6 @@ impl Remote {
 
     async fn upload(&mut self, name: &str, bytes: &[u8]) -> Result<(), String> {
         match self {
-            Remote::Nextcloud { config, client } => {
-                let response = client
-                    .put(config.object_url(name))
-                    .basic_auth(&config.username, Some(&config.app_password))
-                    .header("Content-Type", "application/octet-stream")
-                    .body(bytes.to_vec())
-                    .send()
-                    .await
-                    .map_err(|error| format!("falha ao enviar dados à nuvem: {error}"))?;
-                if response.status().is_success() {
-                    Ok(())
-                } else {
-                    Err(format!("falha ao enviar dados à nuvem: HTTP {}", response.status().as_u16()))
-                }
-            }
             Remote::GoogleDrive { access_token, client, ids } => {
                 google_resolve_ids(client, access_token, ids).await?;
                 if let Some(id) = ids.get(name) {
@@ -1389,35 +1300,6 @@ async fn google_resolve_ids(
     Ok(())
 }
 
-struct NextcloudConfig {
-    base_url: String,
-    username: String,
-    app_password: String,
-}
-
-impl NextcloudConfig {
-    fn from_settings(settings: &AppSettings) -> Result<Self, String> {
-        let server = settings.nextcloud_url.trim().to_string();
-        let username = settings.nextcloud_username.trim().to_string();
-        if server.is_empty() || username.is_empty() {
-            return Err("Nextcloud não configurado: informe o endereço do servidor e o usuário em Configurações.".into());
-        }
-        let app_password = read_secret(KEYRING_APP_PASSWORD_USER)?
-            .ok_or_else(|| "senha de app do Nextcloud não configurada".to_string())?;
-        let server = server.trim_end_matches('/');
-        let base_url = format!("{server}/remote.php/dav/files/{}", percent_encode(&username));
-        Ok(Self { base_url, username, app_password })
-    }
-
-    fn folder_url(&self) -> String {
-        format!("{}/{}", self.base_url, percent_encode(REMOTE_FOLDER))
-    }
-
-    fn object_url(&self, name: &str) -> String {
-        format!("{}/{}", self.folder_url(), percent_encode(name))
-    }
-}
-
 /// Codificação percentual simples (ASCII), suficiente para nomes gerados
 /// pelo app (uuid, slugs, caminhos relativos codificados) — nunca recebe
 /// texto arbitrário sem passar por aqui.
@@ -1432,10 +1314,6 @@ fn percent_encode(value: &str) -> String {
             }
         })
         .collect()
-}
-
-fn webdav_method(name: &str) -> reqwest::Method {
-    reqwest::Method::from_bytes(name.as_bytes()).expect("nome de método WebDAV estático válido")
 }
 
 // ------------------------------------------------------------- criptografia
@@ -1610,12 +1488,6 @@ mod tests {
         assert_eq!(percent_encode("HostDrive"), "HostDrive");
         assert_eq!(percent_encode("pasta com espaço"), "pasta%20com%20espa%C3%A7o");
         assert_eq!(percent_encode("raul.greco-1_2~3"), "raul.greco-1_2~3");
-    }
-
-    #[test]
-    fn set_nextcloud_credentials_rejects_short_passphrases_and_empty_app_password() {
-        assert!(set_nextcloud_credentials("".into(), "frase longa suficiente".into()).is_err());
-        assert!(set_nextcloud_credentials("app-pass".into(), "curta".into()).is_err());
     }
 
     #[test]
