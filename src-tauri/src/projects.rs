@@ -195,6 +195,15 @@ impl ProjectRepository {
                 "UPDATE app_settings SET cloud_sync_enabled = nextcloud_sync_enabled",
             )?;
         }
+        // Provedor removido (Nextcloud, decisão 008): sem provedor válido não
+        // existe sync — desliga e limpa a escolha em vez de tentar sincronizar
+        // contra um provedor que o app não tem mais. O resto da config fica.
+        connection.execute_batch(
+            "UPDATE app_settings SET cloud_sync_enabled = 0 WHERE cloud_provider NOT IN ('', 'google', 'onedrive')",
+        )?;
+        connection.execute_batch(
+            "UPDATE app_settings SET cloud_provider = '' WHERE cloud_provider NOT IN ('', 'google', 'onedrive')",
+        )?;
         connection.execute_batch(
             "CREATE TABLE IF NOT EXISTS project_memory (
                project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
