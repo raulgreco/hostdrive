@@ -16,7 +16,7 @@
   },
   "plugins": {
     "updater": {
-      "endpoints": ["https://github.com/raulgreco/universal-cli/releases/latest/download/latest.json"],
+      "endpoints": ["https://github.com/eureka42-ai/universal-cli/releases/latest/download/latest.json"],
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDUzRjIzMzFFOEM4NDU1OUEKUldTYVZZU01IalB5VTlqR3ZzMkhwQ3kxcWR1U0RLTm1XNW9wNGRuRE55dldzdUFOM1E4enVrRDMK"
     }
   },

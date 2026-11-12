@@ -18,6 +18,10 @@
 </p>
 
 <p align="center">
+  <img src="https://skillicons.dev/icons?i=rust,ts,react,tauri,vite,sqlite,css,git,githubactions&theme=dark" alt="Rust · TypeScript · React · Tauri · Vite · SQLite · CSS · Git · GitHub Actions">
+</p>
+
+<p align="center">
   <img src="docs/images/splash.png" alt="Splash Eureka42 Universal CLI" width="560">
 </p>
 
