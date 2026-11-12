@@ -69,12 +69,12 @@ pub fn run() {
         ])
         .build(tauri::generate_context!())
         .expect("error while building Eureka42")
-        .run(|app_handle, event| {
+        .run(|_app_handle, _event| {
             // Padrão macOS: com a janela fechada (escondida), clicar no ícone
             // na Dock reabre a janela. ⌘Q continua encerrando o app de verdade.
             #[cfg(target_os = "macos")]
-            if let tauri::RunEvent::Reopen { .. } = event {
-                if let Some(window) = app_handle.get_webview_window("main") {
+            if let tauri::RunEvent::Reopen { .. } = _event {
+                if let Some(window) = _app_handle.get_webview_window("main") {
                     let _ = window.show();
                     let _ = window.set_focus();
                 }
